@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "681757798375",
+    "project_id": "kitty-story",
+    "storage_bucket": "kitty-story.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:681757798375:android:455f31935feb12dc4cd742",
+        "android_client_info": {
+          "package_name": "com.kuramallc.kitty_story"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD6SAxGgg7q4Yn6Dx7d-o8SrE_SnE8kl_g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
