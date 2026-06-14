@@ -1,0 +1,99 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../auth/data/auth_repository.dart';
+import '../../voices/data/voice_repository.dart' show kFunctionsRegion;
+import '../domain/story.dart';
+
+class StoryRepository {
+  StoryRepository(this._auth, this._firestore, this._functions);
+
+  final FirebaseAuth _auth;
+  final FirebaseFirestore _firestore;
+  final FirebaseFunctions _functions;
+
+  /// Curated, world-readable library.
+  Stream<List<Story>> watchLibrary() {
+    return _firestore
+        .collection('stories')
+        .orderBy('title')
+        .snapshots()
+        .map((s) => s.docs.map(Story.fromLibraryDoc).toList());
+  }
+
+  /// This user's AI-generated stories, newest first.
+  Stream<List<Story>> watchGenerated() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Stream.value(const []);
+    return _firestore
+        .collection('users').doc(uid)
+        .collection('generatedStories')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map(Story.fromGeneratedDoc).toList());
+  }
+
+  /// Generates a kid-safe story via Claude and returns it (also persisted
+  /// server-side under generatedStories).
+  Future<Story> generateStory({
+    String? childName,
+    String? theme,
+    String? characters,
+    String? ageRange,
+  }) async {
+    final result = await _callable('generateStory', const Duration(minutes: 2))
+        .call<Map<String, dynamic>>({
+      'childName': childName,
+      'theme': theme,
+      'characters': characters,
+      'ageRange': ageRange,
+    });
+    final data = Map<String, dynamic>.from(result.data);
+    return Story(
+      id: data['storyId'] as String,
+      source: StorySource.generated,
+      title: data['title'] as String,
+      text: data['text'] as String,
+      ageRange: ageRange,
+    );
+  }
+
+  /// Synthesizes (or returns cached) narration of [story] in [voiceId] and
+  /// returns the playable mp3 URL.
+  Future<String> synthesize({
+    required Story story,
+    required String voiceId,
+  }) async {
+    final result =
+        await _callable('synthesizeNarration', const Duration(minutes: 9))
+            .call<Map<String, dynamic>>({
+      'storyId': story.id,
+      'storySource': story.source.key,
+      'voiceId': voiceId,
+    });
+    return Map<String, dynamic>.from(result.data)['url'] as String;
+  }
+
+  HttpsCallable _callable(String name, Duration timeout) =>
+      _functions.httpsCallable(name, options: HttpsCallableOptions(timeout: timeout));
+}
+
+final storyRepositoryProvider = Provider<StoryRepository>((ref) {
+  return StoryRepository(
+    FirebaseAuth.instance,
+    FirebaseFirestore.instance,
+    FirebaseFunctions.instanceFor(region: kFunctionsRegion),
+  );
+});
+
+final libraryStoriesProvider = StreamProvider.autoDispose<List<Story>>((ref) {
+  return ref.watch(storyRepositoryProvider).watchLibrary();
+});
+
+final myStoriesProvider = StreamProvider.autoDispose<List<Story>>((ref) {
+  final user = ref.watch(authStateChangesProvider).value;
+  if (user == null) return Stream.value(const []);
+  return ref.watch(storyRepositoryProvider).watchGenerated();
+});
