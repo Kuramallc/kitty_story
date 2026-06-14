@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Raw voice samples (input to cloning). Owner uploads/reads; capped size,
+    // audio only.
+    match /users/{uid}/voiceSamples/{fileName} {
+      allow read: if isOwner(uid);
+      allow write: if isOwner(uid)
+                   && request.resource.size < 25 * 1024 * 1024
+                   && request.resource.contentType.matches('audio/.*');
+    }
+
+    // Synthesized narration audio: written by Cloud Functions; owner reads.
+    match /users/{uid}/narrations/{fileName} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+
+    // Library cover art: public read, admin/Cloud-Function write only.
+    match /stories/{storyId}/{fileName} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

@@ -1,0 +1,42 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Per-user data. Users may only ever touch their own subtree.
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      // Voice profiles. The client creates/renames/deletes the doc; the
+      // elevenLabsVoiceId + status are written by Cloud Functions (the Admin
+      // SDK bypasses these rules).
+      match /voices/{voiceId} {
+        allow read, create, update, delete: if isOwner(uid);
+      }
+
+      // AI-generated stories owned by the user.
+      match /generatedStories/{storyId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Cached narration metadata is written by Cloud Functions only.
+      match /narrations/{narrationId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+    }
+
+    // Curated story library: world-readable, admin/Cloud-Function writable only.
+    match /stories/{storyId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
