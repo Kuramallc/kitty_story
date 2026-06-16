@@ -1,16 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
-import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { requireAuth } from "./auth";
-import { REGION, STORY_MODEL } from "./config";
-
-/** Declared here (not config.ts) so the secret is only registered once this
- * module is exported from index.ts — defineSecret() runs at module load and a
- * deploy fails if any loaded module binds an unset secret. */
-const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
+import { ANTHROPIC_API_KEY, REGION, STORY_MODEL } from "./config";
 
 interface GenerateStoryData {
   childName?: string;

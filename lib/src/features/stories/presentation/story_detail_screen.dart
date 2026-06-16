@@ -101,7 +101,17 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
     final theme = Theme.of(context);
     final story = widget.story;
     return Scaffold(
-      appBar: AppBar(title: Text(story.title)),
+      appBar: AppBar(
+        title: Text(story.title),
+        actions: [
+          if (story.source == StorySource.generated)
+            TextButton.icon(
+              icon: const Icon(Icons.ios_share),
+              label: const Text('Share'),
+              onPressed: () => context.push('/stories/publish', extra: story),
+            ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [

@@ -4,9 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// `synthesizeNarration` Cloud Function expects.
 enum StorySource {
   library,
-  generated;
+  generated,
+  published;
 
-  String get key => name; // "library" | "generated"
+  String get key => name; // "library" | "generated" | "published"
 }
 
 /// A bedtime story — either curated (shared `stories/`) or AI-generated

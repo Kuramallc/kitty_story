@@ -14,7 +14,7 @@ import {
 } from "./config";
 import { elevenLabsClient, streamToBuffer } from "./elevenlabs";
 
-type StorySource = "library" | "generated" | "test";
+type StorySource = "library" | "generated" | "test" | "published";
 
 interface SynthesizeNarrationData {
   storyId: string;
@@ -50,11 +50,11 @@ export const synthesizeNarration = onCall<SynthesizeNarrationData>(
     if (
       typeof storyId !== "string" || storyId.length === 0 ||
       typeof voiceId !== "string" || voiceId.length === 0 ||
-      !["library", "generated", "test"].includes(storySource as string)
+      !["library", "generated", "test", "published"].includes(storySource as string)
     ) {
       throw new HttpsError(
         "invalid-argument",
-        "storyId, storySource (library|generated|test) and voiceId are required.",
+        "storyId, storySource (library|generated|test|published) and voiceId are required.",
       );
     }
 
@@ -131,7 +131,9 @@ async function resolveStoryText(
   const db = getFirestore();
   const ref = source === "library"
     ? db.collection("stories").doc(storyId)
-    : db.collection("users").doc(uid).collection("generatedStories").doc(storyId);
+    : source === "published"
+      ? db.collection("publishedStories").doc(storyId)
+      : db.collection("users").doc(uid).collection("generatedStories").doc(storyId);
   const snapshot = await ref.get();
   const text = snapshot.get("text") as string | undefined;
   if (!snapshot.exists || !text) {

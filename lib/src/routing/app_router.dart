@@ -14,6 +14,10 @@ import '../features/stories/presentation/generate_story_screen.dart';
 import '../features/stories/presentation/stories_screen.dart';
 import '../features/stories/presentation/story_detail_screen.dart';
 import '../features/player/presentation/player_screen.dart';
+import '../features/community/domain/published_story.dart';
+import '../features/community/presentation/community_detail_screen.dart';
+import '../features/community/presentation/explore_screen.dart';
+import '../features/community/presentation/publish_tags_screen.dart';
 import 'go_router_refresh_stream.dart';
 
 /// App router with auth gating. When Firebase isn't configured we skip gating
@@ -24,9 +28,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: '/',
+    // Only refresh on a real signed-in/out transition — not on hourly token
+    // refreshes, which would rebuild the navigator and drop route `extra`.
     refreshListenable: authRepository == null
         ? null
-        : GoRouterRefreshStream(authRepository.authStateChanges()),
+        : GoRouterRefreshStream(
+            authRepository.authStateChanges().map((u) => u != null).distinct(),
+          ),
     redirect: (context, state) {
       if (authRepository == null) return null; // Firebase not configured.
       final loggedIn = authRepository.currentUser != null;
@@ -87,6 +95,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/player',
         name: 'player',
         builder: (context, state) => PlayerScreen(args: state.extra as PlayerArgs),
+      ),
+      GoRoute(
+        path: '/explore',
+        name: 'explore',
+        builder: (context, state) => const ExploreScreen(),
+      ),
+      GoRoute(
+        path: '/explore/story/:id',
+        name: 'communityDetail',
+        builder: (context, state) => CommunityDetailScreen(
+          storyId: state.pathParameters['id']!,
+          initial: state.extra as PublishedStory?,
+        ),
+      ),
+      GoRoute(
+        path: '/stories/publish',
+        name: 'publishStory',
+        builder: (context, state) => PublishTagsScreen(story: state.extra as Story),
       ),
     ],
   );

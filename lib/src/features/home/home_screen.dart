@@ -66,6 +66,13 @@ class HomeScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed:
+                    firebaseReady ? () => context.push('/explore') : null,
+                icon: const Icon(Icons.travel_explore),
+                label: const Text('Explore community'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed:
                     firebaseReady ? () => context.push('/voices') : null,
                 icon: const Icon(Icons.record_voice_over_outlined),
                 label: const Text('Family voices'),
