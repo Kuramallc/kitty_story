@@ -24,7 +24,10 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(56),
+          // Tall, easy-tap buttons. A finite min width (not Size.fromHeight,
+          // which is Size(infinity, 56)) so FilledButtons also lay out inside
+          // Rows — full-width buttons set their width via the parent anyway.
+          minimumSize: const Size(64, 56),
           textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
