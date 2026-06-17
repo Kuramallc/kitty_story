@@ -118,3 +118,43 @@ register it under App Check → Manage debug tokens so callable functions accept
 | Secrets | `functions/src/config.ts` (names only) + Secret Manager |
 | Security rules | `firestore.rules`, `storage.rules` |
 | Emulator config | `firebase.json` |
+| Plan limits / App Check flag | `functions/src/config.ts` |
+
+---
+
+## 5. Phase 5 — hardening & monetization (your actions)
+
+### Subscription (RevenueCat)
+1. Create a RevenueCat project; add an App Store Connect auto-renewable
+   subscription (**$1.99/mo, US storefront**) + a sandbox tester. Create an
+   **entitlement** named `unlimited` and attach the product to the default
+   **offering**.
+2. Build the app with the public SDK key:
+   `flutter run --dart-define=REVENUECAT_API_KEY=appl_xxxxx` (empty key ⇒ the
+   app stays free-tier-only, no paywall — fine for dev).
+3. `firebase functions:secrets:set REVENUECAT_WEBHOOK_AUTH` (any random string),
+   then in RevenueCat → Project → Webhooks set the URL to the deployed
+   `revenueCatWebhook` and the **Authorization** header to that value.
+
+### App Check enforcement  *(breaking — do last)*
+1. Run the app once; copy the printed **App Check debug token** → Firebase console
+   → App Check → *Manage debug tokens* (do this for the sim **and** any test
+   device, or enforced calls 403). Enable App Attest (Apple) / Play Integrity
+   (Android) for release.
+2. Flip `ENFORCE_APP_CHECK = true` in [`functions/src/config.ts`](functions/src/config.ts)
+   and redeploy. Verify the app still calls through and a tokenless `curl` is rejected.
+
+### Other
+- **Admin (moderation takedown):** `node functions/scripts/set-admin.mjs <uid>`
+  (after `gcloud auth application-default login`). Sign out/in to refresh claims.
+- **Google Sign-In (Android):** build with
+  `--dart-define=GOOGLE_SERVER_CLIENT_ID=xxxx.apps.googleusercontent.com`.
+
+### Pre-store-submission checklist (deferred)
+- **Stop shipping the test voice sample:** remove `assets/test_fixtures/` from
+  [`pubspec.yaml`](pubspec.yaml); upload `voice_sample.m4a` to Storage
+  (`test_fixtures/voice_sample.m4a`) and have the integration tests download it
+  (add a `test_fixtures` read rule to `storage.rules`). 205 KB, non-sensitive, so
+  safe to defer until submission.
+- **App icon:** add `flutter_launcher_icons` with final art (a twilight-moon
+  matching the in-app logo).

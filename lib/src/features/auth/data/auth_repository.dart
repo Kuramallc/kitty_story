@@ -3,11 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
-/// Optional OAuth **web** client id (Firebase console → Project settings → your
-/// apps, or `google-services.json` `client_type: 3`). Required on Android for
-/// Google Sign-In to return an ID token Firebase will accept. Fill this in
-/// during SETUP.md §3; leave `null` until then.
-const String? googleServerClientId = null;
+/// OAuth **web** client id (Firebase console → Project settings → your apps, or
+/// `google-services.json` `client_type: 3`). Required on Android for Google
+/// Sign-In to return an ID token Firebase accepts. Injected at build time:
+///   --dart-define=GOOGLE_SERVER_CLIENT_ID=xxxx.apps.googleusercontent.com
+/// Falls back to null (fine on iOS) when unset. See SETUP.md §3.
+const String? googleServerClientId =
+    bool.hasEnvironment('GOOGLE_SERVER_CLIENT_ID')
+        ? String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID')
+        : null;
 
 /// Thin wrapper over [FirebaseAuth] with the sign-in methods the app supports.
 class AuthRepository {

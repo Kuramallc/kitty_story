@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -30,6 +31,11 @@ void main() {
       (tester) async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
+    );
+    // Required once App Check enforcement is on; harmless while it's off.
+    await FirebaseAppCheck.instance.activate(
+      providerApple: const AppleDebugProvider(),
+      providerAndroid: const AndroidDebugProvider(),
     );
 
     // Fresh throwaway account.
