@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../common/widgets/parental_gate.dart';
 import '../../player/presentation/player_screen.dart';
 import '../../voices/data/voice_repository.dart';
 import '../../voices/domain/voice_profile.dart';
@@ -96,6 +97,13 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
     );
   }
 
+  /// Publishing makes the story visible to other families' children, so it's
+  /// gated behind a grown-up check.
+  Future<void> _share(Story story) async {
+    if (!await showParentalGate(context)) return;
+    if (mounted) context.push('/stories/publish', extra: story);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -108,7 +116,7 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
             TextButton.icon(
               icon: const Icon(Icons.ios_share),
               label: const Text('Share'),
-              onPressed: () => context.push('/stories/publish', extra: story),
+              onPressed: () => _share(story),
             ),
         ],
       ),

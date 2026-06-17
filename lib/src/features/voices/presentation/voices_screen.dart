@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../../common/widgets/async_value_widget.dart';
+import '../../../common/widgets/parental_gate.dart';
+import '../../subscription/data/subscription_repository.dart';
+import '../../subscription/presentation/paywall_screen.dart';
 import '../data/voice_repository.dart';
 import '../domain/voice_profile.dart';
 
@@ -53,6 +56,9 @@ class _VoicesScreenState extends ConsumerState<VoicesScreen> {
   }
 
   Future<void> _confirmDelete(VoiceProfile voice) async {
+    // A grown-up check before a destructive, data-removing action.
+    if (!await showParentalGate(context)) return;
+    if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -85,6 +91,21 @@ class _VoicesScreenState extends ConsumerState<VoicesScreen> {
     }
   }
 
+  Future<void> _addVoice() async {
+    // Free tier caps the number of voices — show the paywall instead of
+    // recording another.
+    final entitled = ref.read(entitlementActiveProvider).value ?? false;
+    final count = ref.read(voicesStreamProvider).value?.length ?? 0;
+    if (!entitled && count >= kFreeMaxVoices) {
+      await showPaywall(context,
+          reason: 'The free plan includes $kFreeMaxVoices voices.');
+      return;
+    }
+    // Parental gate before recording a voice.
+    if (!await showParentalGate(context)) return;
+    if (mounted) context.push('/voices/consent');
+  }
+
   @override
   Widget build(BuildContext context) {
     final voices = ref.watch(voicesStreamProvider);
@@ -92,7 +113,7 @@ class _VoicesScreenState extends ConsumerState<VoicesScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Family voices')),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/voices/consent'),
+        onPressed: _addVoice,
         icon: const Icon(Icons.add),
         label: const Text('Add a voice'),
       ),
