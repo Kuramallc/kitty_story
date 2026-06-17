@@ -44,10 +44,12 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
     try {
       final s = await _repo.fetchPublished(widget.storyId);
       if (!mounted) return;
+      // Treat removed / under-review stories as gone (e.g. opened from Saved).
+      final available = s != null && s.status == 'published';
       setState(() {
-        _story = s;
+        _story = available ? s : null;
         _likeCount = s?.likeCount ?? 0;
-        _loadFailed = s == null;
+        _loadFailed = !available;
       });
     } catch (_) {
       if (mounted) setState(() => _loadFailed = true);

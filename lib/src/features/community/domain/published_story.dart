@@ -39,6 +39,7 @@ class PublishedStory {
     required this.tags,
     required this.likeCount,
     required this.commentCount,
+    this.status = 'published',
     this.createdAt,
   });
 
@@ -49,6 +50,10 @@ class PublishedStory {
   final StoryTags tags;
   final int likeCount;
   final int commentCount;
+
+  /// "published" (visible), "under_review" (auto-hidden by reports), or
+  /// "removed" (admin takedown). Explore only ever returns "published".
+  final String status;
   final DateTime? createdAt;
 
   /// Adapts to a [Story] (published source) so it narrates via the existing
@@ -70,6 +75,7 @@ class PublishedStory {
       tags: StoryTags.fromMap(d['tags'] as Map<String, dynamic>?),
       likeCount: (d['likeCount'] as num?)?.toInt() ?? 0,
       commentCount: (d['commentCount'] as num?)?.toInt() ?? 0,
+      status: (d['status'] as String?) ?? 'published',
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
     );
   }
