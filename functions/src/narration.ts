@@ -8,11 +8,13 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { requireAuth } from "./auth";
 import {
   ELEVENLABS_API_KEY,
+  ENFORCE_APP_CHECK,
   REGION,
   TTS_MODEL,
   TTS_OUTPUT_FORMAT,
 } from "./config";
 import { elevenLabsClient, streamToBuffer } from "./elevenlabs";
+import { enforceQuota } from "./limits";
 
 type StorySource = "library" | "generated" | "test" | "published";
 
@@ -41,8 +43,7 @@ export const synthesizeNarration = onCall<SynthesizeNarrationData>(
     secrets: [ELEVENLABS_API_KEY],
     timeoutSeconds: 540,
     memory: "1GiB",
-    // TODO(Phase 5): re-enable App Check enforcement for release.
-    enforceAppCheck: false,
+    enforceAppCheck: ENFORCE_APP_CHECK,
   },
   async (request) => {
     const uid = requireAuth(request);
@@ -73,6 +74,12 @@ export const synthesizeNarration = onCall<SynthesizeNarrationData>(
         url: tokenUrl(bucket.name, cached.get("audioPath"), cached.get("downloadToken")),
         cached: true,
       };
+    }
+
+    // Free tier: a fresh (uncached) narration is a "play". The short voice-test
+    // sample and cached replays don't count.
+    if (storySource !== "test") {
+      await enforceQuota(uid, "synthesizeNarration");
     }
 
     const text = await resolveStoryText(uid, storyId, storySource as StorySource);

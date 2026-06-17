@@ -12,7 +12,19 @@ service cloud.firestore {
 
     // Per-user data. Users may only ever touch their own subtree.
     match /users/{uid} {
-      allow read, write: if isOwner(uid);
+      // The subscription entitlement is written only by the RevenueCat webhook
+      // (Admin SDK bypasses rules); the client must never forge it.
+      allow read, delete: if isOwner(uid);
+      allow create: if isOwner(uid) && !('subscription' in request.resource.data);
+      allow update: if isOwner(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny(['subscription']);
+
+      // Rolling-window quota counters — Cloud Functions (enforcement) only.
+      match /limits/{action} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
 
       // Voice profiles. The client creates/renames/deletes the doc; the
       // elevenLabsVoiceId + status are written by Cloud Functions (the Admin

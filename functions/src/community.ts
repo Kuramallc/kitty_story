@@ -6,10 +6,16 @@ import * as logger from "firebase-functions/logger";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { requireAuth } from "./auth";
-import { ANTHROPIC_API_KEY, MODERATION_MODEL, REGION } from "./config";
+import {
+  ANTHROPIC_API_KEY,
+  ENFORCE_APP_CHECK,
+  MODERATION_MODEL,
+  REGION,
+} from "./config";
+import { enforceQuota } from "./limits";
 
-// Shared callable options. App Check stays off until Phase 5.
-const BASE = { region: REGION, enforceAppCheck: false } as const;
+// Shared callable options.
+const BASE = { region: REGION, enforceAppCheck: ENFORCE_APP_CHECK } as const;
 
 interface Tags {
   content: string[];
@@ -168,6 +174,7 @@ export const publishStory = onCall<PublishData>(
 
     const existing = snap.get("publishedStoryId") as string | undefined;
     if (existing) return { publishedStoryId: existing, alreadyPublished: true };
+    await enforceQuota(uid, "publishStory");
 
     // Trust the cached moderation verdict if the text is unchanged; else re-check.
     const cached = snap.get("moderation") as { safe?: boolean; textSha?: string } | undefined;
@@ -272,6 +279,7 @@ export const addComment = onCall<CommentData>(
   { ...BASE, secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
   async (request) => {
     const uid = requireAuth(request);
+    await enforceQuota(uid, "addComment");
     const publishedStoryId = request.data?.publishedStoryId;
     const raw = request.data?.text;
     if (

@@ -4,7 +4,8 @@ import * as logger from "firebase-functions/logger";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { requireAuth } from "./auth";
-import { ANTHROPIC_API_KEY, REGION, STORY_MODEL } from "./config";
+import { ANTHROPIC_API_KEY, ENFORCE_APP_CHECK, REGION, STORY_MODEL } from "./config";
+import { enforceQuota } from "./limits";
 
 interface GenerateStoryData {
   childName?: string;
@@ -95,11 +96,11 @@ export const generateStory = onCall<GenerateStoryData>(
     secrets: [ANTHROPIC_API_KEY],
     timeoutSeconds: 120,
     memory: "512MiB",
-    // TODO(Phase 5): re-enable App Check enforcement for release.
-    enforceAppCheck: false,
+    enforceAppCheck: ENFORCE_APP_CHECK,
   },
   async (request) => {
     const uid = requireAuth(request);
+    await enforceQuota(uid, "generateStory");
     const { prompt, cleaned } = buildUserPrompt(request.data ?? {});
 
     logger.info("Generating story", { uid, model: STORY_MODEL });

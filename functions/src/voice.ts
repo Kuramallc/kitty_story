@@ -9,8 +9,9 @@ import * as logger from "firebase-functions/logger";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { requireAuth } from "./auth";
-import { ELEVENLABS_API_KEY, REGION } from "./config";
+import { ELEVENLABS_API_KEY, ENFORCE_APP_CHECK, REGION } from "./config";
 import { elevenLabsClient } from "./elevenlabs";
+import { enforceVoiceLimit } from "./limits";
 
 interface CreateVoiceProfileData {
   voiceId: string; // Firestore doc id under users/{uid}/voices
@@ -29,8 +30,7 @@ export const createVoiceProfile = onCall<CreateVoiceProfileData>(
     secrets: [ELEVENLABS_API_KEY],
     timeoutSeconds: 300,
     memory: "512MiB",
-    // TODO(Phase 5): re-enable App Check enforcement for release.
-    enforceAppCheck: false,
+    enforceAppCheck: ENFORCE_APP_CHECK,
   },
   async (request) => {
     const uid = requireAuth(request);
@@ -60,6 +60,10 @@ export const createVoiceProfile = onCall<CreateVoiceProfileData>(
     if (voice.elevenLabsVoiceId) {
       return { elevenLabsVoiceId: voice.elevenLabsVoiceId, alreadyCloned: true };
     }
+
+    // Free tier caps the number of voices (defense-in-depth — the client also
+    // gates this before recording).
+    await enforceVoiceLimit(uid, voiceId);
 
     await voiceRef.update({ status: "processing", error: FieldValue.delete() });
 
@@ -108,8 +112,7 @@ export const deleteVoiceProfile = onCall<DeleteVoiceProfileData>(
     region: REGION,
     secrets: [ELEVENLABS_API_KEY],
     timeoutSeconds: 120,
-    // TODO(Phase 5): re-enable App Check enforcement for release.
-    enforceAppCheck: false,
+    enforceAppCheck: ENFORCE_APP_CHECK,
   },
   async (request) => {
     const uid = requireAuth(request);
