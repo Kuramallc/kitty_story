@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../stories/data/story_repository.dart';
 import '../../stories/domain/story.dart';
+import '../../subscription/presentation/paywall_screen.dart';
 import '../../voices/data/voice_repository.dart';
 import '../../voices/domain/voice_profile.dart';
 import 'player_screen.dart';
@@ -55,6 +56,9 @@ Future<void> tellStoryInVoice(
       context.push('/player', extra: PlayerArgs(url: url, title: title));
     }
   } catch (error) {
+    if (!context.mounted) return;
+    // A free-tier limit surfaces the paywall instead of a bare error.
+    if (await showPaywallIfQuota(context, error)) return;
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not play the story: $error')),

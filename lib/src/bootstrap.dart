@@ -14,6 +14,7 @@ import 'app.dart';
 import 'common/providers/firebase_providers.dart';
 import 'features/player/application/audio_providers.dart';
 import 'features/player/audio/audio_handler.dart';
+import 'features/subscription/data/subscription_repository.dart';
 
 /// Flip to `true` while running the local Firebase emulator suite
 /// (`firebase emulators:start`). See SETUP.md.
@@ -32,11 +33,16 @@ Future<void> bootstrap() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    // Debug providers for development. Switch to Play Integrity (Android) and
-    // App Attest / DeviceCheck (Apple) for release builds — see SETUP.md.
+    // Real attestation in release; debug providers in dev. The dev debug token
+    // (printed on first run) must be registered in the Firebase console once
+    // App Check enforcement is on — see SETUP.md.
     await FirebaseAppCheck.instance.activate(
-      providerAndroid: const AndroidDebugProvider(),
-      providerApple: const AppleDebugProvider(),
+      providerAndroid: kReleaseMode
+          ? const AndroidPlayIntegrityProvider()
+          : const AndroidDebugProvider(),
+      providerApple: kReleaseMode
+          ? const AppleAppAttestWithDeviceCheckFallbackProvider()
+          : const AppleDebugProvider(),
     );
     if (_useEmulators) {
       await _connectToEmulators();
@@ -47,6 +53,9 @@ Future<void> bootstrap() async {
     debugPrint('Firebase not initialized yet: $error');
     if (kDebugMode) debugPrintStack(stackTrace: stackTrace);
   }
+
+  // RevenueCat (subscriptions). No-op without a configured API key.
+  await configureRevenueCat();
 
   // Background-capable audio handler for the bedtime player. Guarded so a
   // failure here never blocks app startup.

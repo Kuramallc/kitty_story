@@ -51,6 +51,7 @@ dependencies:
   cached_network_image: ^3.4.1
   audio_service: ^0.18.18
   audio_session: ^0.2.3
+  purchases_flutter: ^10.2.3
 
 dev_dependencies:
   flutter_test:
