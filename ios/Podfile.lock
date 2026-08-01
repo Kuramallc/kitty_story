@@ -1458,9 +1458,15 @@ PODS:
   - permission_handler_apple (9.4.8):
     - Flutter
   - PromisesObjC (2.4.1)
+  - purchases_flutter (10.2.3):
+    - Flutter
+    - PurchasesHybridCommon (= 18.14.1)
+  - PurchasesHybridCommon (18.14.1):
+    - RevenueCat (= 5.78.0)
   - RecaptchaInterop (101.0.0)
   - record_ios (1.2.1):
     - Flutter
+  - RevenueCat (5.78.0)
   - sign_in_with_apple (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -1482,6 +1488,7 @@ DEPENDENCIES:
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
   - just_audio (from `.symlinks/plugins/just_audio/darwin`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
+  - purchases_flutter (from `.symlinks/plugins/purchases_flutter/ios`)
   - record_ios (from `.symlinks/plugins/record_ios/ios`)
   - sign_in_with_apple (from `.symlinks/plugins/sign_in_with_apple/darwin`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
@@ -1515,7 +1522,9 @@ SPEC REPOS:
     - leveldb-library
     - nanopb
     - PromisesObjC
+    - PurchasesHybridCommon
     - RecaptchaInterop
+    - RevenueCat
 
 EXTERNAL SOURCES:
   audio_service:
@@ -1544,6 +1553,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/just_audio/darwin"
   permission_handler_apple:
     :path: ".symlinks/plugins/permission_handler_apple/ios"
+  purchases_flutter:
+    :path: ".symlinks/plugins/purchases_flutter/ios"
   record_ios:
     :path: ".symlinks/plugins/record_ios/ios"
   sign_in_with_apple:
@@ -1592,8 +1603,11 @@ SPEC CHECKSUMS:
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   permission_handler_apple: 92d754bbaa7361d436db2d6c3c1c2a0fdcec462e
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
+  purchases_flutter: c2af1311b818f75b549290971a928cb30036cb82
+  PurchasesHybridCommon: 825e4e748b62c919bc4cb4032b0d1e452409bd74
   RecaptchaInterop: 11e0b637842dfb48308d242afc3f448062325aba
   record_ios: 980fd386a97a35987d0fce3dfda4b26a38c90f4c
+  RevenueCat: f3641992451c1426da8d8d1466cec3bbdb765962
   sign_in_with_apple: 5e34677a4e74c5f42760f41b3bbe05343e84d171
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
 

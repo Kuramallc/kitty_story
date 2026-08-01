@@ -113,8 +113,8 @@ class _PaywallSheetState extends ConsumerState<_PaywallSheet> {
           const SizedBox(height: 16),
           for (final benefit in const [
             'Unlimited family voices',
-            'Unlimited bedtime stories every week',
-            'Support a tiny indie app 💜',
+            'Unlimited bedtime stories — no weekly limit',
+            'Cancel anytime',
           ])
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
