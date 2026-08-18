@@ -129,9 +129,13 @@ register it under App Check → Manage debug tokens so callable functions accept
    subscription (**$1.99/mo, US storefront**) + a sandbox tester. Create an
    **entitlement** named `unlimited` and attach the product to the default
    **offering**.
-2. Build the app with the public SDK key:
-   `flutter run --dart-define=REVENUECAT_API_KEY=appl_xxxxx` (empty key ⇒ the
-   app stays free-tier-only, no paywall — fine for dev).
+2. Build with the **public** SDK key(s). Production keys are per-store, so pass
+   the ones for the platforms you're building:
+   `flutter run --dart-define=REVENUECAT_IOS_API_KEY=appl_xxxxx --dart-define=REVENUECAT_ANDROID_API_KEY=goog_xxxxx`
+   A single `--dart-define=REVENUECAT_API_KEY=…` applies to both platforms — use
+   that for a `test_…` **Test Store** key (dev only; purchases are simulated and
+   App Review rejects Test Store keys). No key ⇒ free-tier-only, no paywall.
+   Never pass a secret key (`sk_…`) to the app — those are server-only.
 3. `firebase functions:secrets:set REVENUECAT_WEBHOOK_AUTH` (any random string),
    then in RevenueCat → Project → Webhooks set the URL to the deployed
    `revenueCatWebhook` and the **Authorization** header to that value.
