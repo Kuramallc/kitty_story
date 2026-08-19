@@ -18,7 +18,18 @@ Future<void> tellStoryInVoice(
   Story story,
   String title,
 ) async {
-  final voices = ref.read(voicesStreamProvider).value ?? const [];
+  final List<VoiceProfile> voices;
+  try {
+    voices = await ref.read(voiceRepositoryProvider).fetchVoices();
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load your voices: $error')),
+      );
+    }
+    return;
+  }
+  if (!context.mounted) return;
   final ready = voices.where((v) => v.isReady).toList();
 
   if (ready.isEmpty) {

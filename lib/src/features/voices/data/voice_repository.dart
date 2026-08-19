@@ -41,6 +41,18 @@ class VoiceRepository {
         .map((s) => s.docs.map(VoiceProfile.fromDoc).toList());
   }
 
+  /// One-shot read of this user's voice profiles, newest first.
+  ///
+  /// Flows that need the list *right now* must use this rather than
+  /// [voicesStreamProvider]: that provider is `autoDispose`, so when nothing is
+  /// currently listening its `.value` is still null and an empty list would be
+  /// mistaken for "no voices".
+  Future<List<VoiceProfile>> fetchVoices() async {
+    final snapshot =
+        await _voices(_uid).orderBy('createdAt', descending: true).get();
+    return snapshot.docs.map(VoiceProfile.fromDoc).toList();
+  }
+
   /// Uploads the recorded sample, creates the voice doc (with consent), and
   /// asks the backend to clone it. Returns the new voice doc id.
   ///

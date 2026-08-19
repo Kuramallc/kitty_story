@@ -24,7 +24,18 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
   bool _busy = false;
 
   Future<void> _tellInVoice() async {
-    final voices = ref.read(voicesStreamProvider).value ?? const [];
+    final List<VoiceProfile> voices;
+    try {
+      voices = await ref.read(voiceRepositoryProvider).fetchVoices();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not load your voices: $error')),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
     final ready = voices.where((v) => v.isReady).toList();
 
     if (ready.isEmpty) {
