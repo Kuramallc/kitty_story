@@ -46,7 +46,12 @@ export const synthesizeNarration = onCall<SynthesizeNarrationData>(
     region: REGION,
     secrets: [ELEVENLABS_API_KEY],
     timeoutSeconds: 540,
-    memory: "1GiB",
+    // The whole story's mp3 is buffered in memory before upload — a long one is
+    // ~10MB, so 512MiB is ample (1GiB was idle overprovisioning).
+    memory: "512MiB",
+    // Keep one instance warm: a cold start added ~10s to the "Preparing…" wait,
+    // which was more than the TTS call itself on short narrations.
+    minInstances: 1,
     enforceAppCheck: ENFORCE_APP_CHECK,
   },
   async (request) => {
