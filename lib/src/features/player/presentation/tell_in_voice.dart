@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../auth/presentation/verify_email_sheet.dart';
 import '../../stories/data/story_repository.dart';
 import '../../stories/domain/story.dart';
 import '../../subscription/presentation/paywall_screen.dart';
@@ -68,7 +69,10 @@ Future<void> tellStoryInVoice(
     }
   } catch (error) {
     if (!context.mounted) return;
-    // A free-tier limit surfaces the paywall instead of a bare error.
+    // An unverified email surfaces the verify sheet, a free-tier limit the
+    // paywall — either way, not a bare error.
+    if (await showVerifyEmailIfNeeded(context, error)) return;
+    if (!context.mounted) return;
     if (await showPaywallIfQuota(context, error)) return;
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

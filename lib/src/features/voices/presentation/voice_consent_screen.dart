@@ -1,19 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../auth/presentation/verify_email_banner.dart';
 
 /// Explains voice cloning in plain language and captures explicit consent
 /// before any recording happens. The acceptance (with version + timestamp)
 /// is stored on the voice doc at creation time.
-class VoiceConsentScreen extends StatefulWidget {
+class VoiceConsentScreen extends ConsumerStatefulWidget {
   const VoiceConsentScreen({super.key});
 
   @override
-  State<VoiceConsentScreen> createState() => _VoiceConsentScreenState();
+  ConsumerState<VoiceConsentScreen> createState() => _VoiceConsentScreenState();
 }
 
-class _VoiceConsentScreenState extends State<VoiceConsentScreen> {
+class _VoiceConsentScreenState extends ConsumerState<VoiceConsentScreen> {
   final _name = TextEditingController();
   bool _accepted = false;
+
+  /// Every route into voice creation lands here, so this is the one place that
+  /// has to check verification — otherwise the user records a two-minute sample
+  /// and only then finds out the backend won't accept it.
+  Future<void> _continue() async {
+    if (!await ensureEmailVerified(context, ref)) return;
+    if (mounted) context.push('/voices/record', extra: _name.text.trim());
+  }
 
   @override
   void dispose() {
@@ -30,6 +41,7 @@ class _VoiceConsentScreenState extends State<VoiceConsentScreen> {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
+            const VerifyEmailBanner(margin: EdgeInsets.only(bottom: 20)),
             Text('Before we record', style: theme.textTheme.titleLarge),
             const SizedBox(height: 12),
             const _InfoTile(
@@ -79,9 +91,8 @@ class _VoiceConsentScreenState extends State<VoiceConsentScreen> {
             ),
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: _accepted && _name.text.trim().isNotEmpty
-                  ? () => context.push('/voices/record', extra: _name.text.trim())
-                  : null,
+              onPressed:
+                  _accepted && _name.text.trim().isNotEmpty ? _continue : null,
               child: const Text('Continue to recording'),
             ),
           ],

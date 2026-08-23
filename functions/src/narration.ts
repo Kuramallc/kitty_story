@@ -5,7 +5,7 @@ import { getStorage } from "firebase-admin/storage";
 import * as logger from "firebase-functions/logger";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
-import { requireAuth } from "./auth";
+import { requireVerifiedEmail } from "./auth";
 import {
   ELEVENLABS_API_KEY,
   ENFORCE_APP_CHECK,
@@ -55,7 +55,7 @@ export const synthesizeNarration = onCall<SynthesizeNarrationData>(
     enforceAppCheck: ENFORCE_APP_CHECK,
   },
   async (request) => {
-    const uid = requireAuth(request);
+    const uid = requireVerifiedEmail(request);
     const { storyId, storySource, voiceId } = request.data ?? {};
     if (
       typeof storyId !== "string" || storyId.length === 0 ||
@@ -185,6 +185,11 @@ async function resolveStoryText(
   const text = snapshot.get("text") as string | undefined;
   if (!snapshot.exists || !text) {
     throw new HttpsError("not-found", `Story ${storyId} (${source}) has no text.`);
+  }
+  // A community story auto-hidden by reports (or taken down) must not still be
+  // narratable through a cache miss.
+  if (source === "published" && snapshot.get("status") !== "published") {
+    throw new HttpsError("not-found", "This story is no longer available.");
   }
   return text;
 }

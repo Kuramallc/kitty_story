@@ -117,6 +117,7 @@ register it under App Check → Manage debug tokens so callable functions accept
 | Cloud Functions | `functions/src/` |
 | Secrets | `functions/src/config.ts` (names only) + Secret Manager |
 | Security rules | `firestore.rules`, `storage.rules` |
+| Security-rules tests | `firestore-tests/` — `npm --prefix firestore-tests test` |
 | Emulator config | `firebase.json` |
 | Plan limits / App Check flag | `functions/src/config.ts` |
 
@@ -141,12 +142,27 @@ register it under App Check → Manage debug tokens so callable functions accept
    `revenueCatWebhook` and the **Authorization** header to that value.
 
 ### App Check enforcement  *(breaking — do last)*
-1. Run the app once; copy the printed **App Check debug token** → Firebase console
-   → App Check → *Manage debug tokens* (do this for the sim **and** any test
-   device, or enforced calls 403). Enable App Attest (Apple) / Play Integrity
-   (Android) for release.
-2. Flip `ENFORCE_APP_CHECK = true` in [`functions/src/config.ts`](functions/src/config.ts)
-   and redeploy. Verify the app still calls through and a tokenless `curl` is rejected.
+
+The client side is already wired ([`lib/src/bootstrap.dart`](lib/src/bootstrap.dart)
+activates Play Integrity / App Attest in release and the debug providers in dev).
+Only the backend flag is left, and flipping it 403s **every** build that isn't
+registered — including any APK already on a tester's phone. So do it in this order:
+
+1. Firebase console → App Check → register **Play Integrity** (Android) and
+   **App Attest** (Apple) for the app.
+2. Run each dev build once and copy the printed **App Check debug token** →
+   App Check → *Manage debug tokens*. Do this for the simulator **and** every
+   physical test device.
+3. Rebuild and redistribute the tester APK/IPA *before* the flip, so testers are
+   already running a build that sends tokens.
+4. Flip `ENFORCE_APP_CHECK = true` in [`functions/src/config.ts`](functions/src/config.ts)
+   and `firebase deploy --only functions`.
+5. Verify: the app still calls through, and a tokenless `curl` against a callable
+   is rejected with 401/403.
+
+`revenueCatWebhook` is an `onRequest` function called by RevenueCat's servers, not
+by the app — it must never get App Check. It's guarded by the shared secret in
+`REVENUECAT_WEBHOOK_AUTH` instead (compared in constant time).
 
 ### Other
 - **Admin (moderation takedown):** `node functions/scripts/set-admin.mjs <uid>`
@@ -162,3 +178,36 @@ register it under App Check → Manage debug tokens so callable functions accept
   safe to defer until submission.
 - **App icon:** add `flutter_launcher_icons` with final art (a twilight-moon
   matching the in-app logo).
+
+## 6. Security model (what enforces what)
+
+**Firestore rules are the trust boundary.** Cloud Functions run with the Admin
+SDK, which bypasses rules, so any field the rules deny to the client is
+function-owned by construction. Three fields depend on this and would be
+exploitable if a rule regressed:
+
+| Field | Trusted by | If client-writable |
+|---|---|---|
+| `generatedStories/*.moderation` | `publishStory` | Publishes unmoderated text to other families' children |
+| `voices/*.elevenLabsVoiceId`, `.status` | `synthesizeNarration` | Narrates anything in another family's cloned voice |
+| `voices/*.consent` | `createVoiceProfile` | Forges the ElevenLabs consent record |
+
+Run the rules suite after **any** edit to `firestore.rules` — it covers each of
+those exploits plus report brigading and hidden-story reads:
+
+```
+npm --prefix firestore-tests install   # once
+npm --prefix firestore-tests test      # boots the emulator and runs 24 cases
+```
+
+**Verified email** gates every callable that spends money or reaches other
+families (`createVoiceProfile`, `generateStory`, `synthesizeNarration`,
+`prepareStoryForPublish`, `publishStory`, `addComment`) — see
+`requireVerifiedEmail` in [`functions/src/auth.ts`](functions/src/auth.ts).
+Google and Apple assert the address themselves, so only email+password signups
+ever see the prompt. Existing password-signup testers must click the link once;
+the app's verify sheet force-refreshes the ID token so no sign-out is needed.
+
+**Rate limits** live in [`functions/src/limits.ts`](functions/src/limits.ts):
+free-tier caps (lifted by a subscription) plus abuse caps that apply to everyone
+as a cost backstop. Tune both in `functions/src/config.ts`.

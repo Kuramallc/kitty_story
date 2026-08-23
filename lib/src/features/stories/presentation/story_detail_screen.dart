@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../common/widgets/parental_gate.dart';
+import '../../auth/presentation/verify_email_sheet.dart';
 import '../../player/presentation/player_screen.dart';
 import '../../voices/data/voice_repository.dart';
 import '../../voices/domain/voice_profile.dart';
@@ -75,6 +76,8 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
             extra: PlayerArgs(url: url, title: widget.story.title));
       }
     } catch (error) {
+      if (!mounted) return;
+      if (await showVerifyEmailIfNeeded(context, error)) return;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not play the story: $error')),

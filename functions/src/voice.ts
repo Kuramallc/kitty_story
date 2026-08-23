@@ -8,7 +8,7 @@ import { getStorage } from "firebase-admin/storage";
 import * as logger from "firebase-functions/logger";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
-import { requireAuth } from "./auth";
+import { requireAuth, requireVerifiedEmail } from "./auth";
 import { ELEVENLABS_API_KEY, ENFORCE_APP_CHECK, REGION } from "./config";
 import { elevenLabsClient } from "./elevenlabs";
 import { enforceVoiceLimit } from "./limits";
@@ -21,8 +21,12 @@ interface CreateVoiceProfileData {
  * Clones the uploaded voice sample with ElevenLabs Instant Voice Cloning.
  *
  * Preconditions (created client-side): users/{uid}/voices/{voiceId} exists,
- * consent.accepted == true, and the sample was uploaded to samplePath.
- * Writes back elevenLabsVoiceId + status "ready" (or "failed").
+ * consent.accepted == true, and the sample was uploaded to samplePath. Those
+ * fields are only trustworthy because firestore.rules validates the create and
+ * forces `consent.at == request.time` — consent can't be fabricated or
+ * backdated offline. Writes back elevenLabsVoiceId + status "ready"/"failed",
+ * which the same rules keep un-writable by the client (synthesizeNarration
+ * reads elevenLabsVoiceId straight off this doc).
  */
 export const createVoiceProfile = onCall<CreateVoiceProfileData>(
   {
@@ -33,7 +37,7 @@ export const createVoiceProfile = onCall<CreateVoiceProfileData>(
     enforceAppCheck: ENFORCE_APP_CHECK,
   },
   async (request) => {
-    const uid = requireAuth(request);
+    const uid = requireVerifiedEmail(request);
     const voiceId = request.data?.voiceId;
     if (typeof voiceId !== "string" || voiceId.length === 0) {
       throw new HttpsError("invalid-argument", "voiceId is required.");

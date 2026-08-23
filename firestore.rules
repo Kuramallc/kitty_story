@@ -26,16 +26,50 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // Voice profiles. The client creates/renames/deletes the doc; the
-      // elevenLabsVoiceId + status are written by Cloud Functions (the Admin
-      // SDK bypasses these rules).
+      // Voice profiles. These rules are the *only* thing standing between a
+      // client and another family's cloned voice: synthesizeNarration trusts
+      // `elevenLabsVoiceId` + `status`, and createVoiceProfile trusts
+      // `consent.accepted`, so none of those may ever be client-writable.
+      // Cloud Functions write them through the Admin SDK, which bypasses rules.
       match /voices/{voiceId} {
-        allow read, create, update, delete: if isOwner(uid);
+        // The exact payload VoiceRepository.createVoiceAndClone sends, and
+        // nothing else. `consent.at == request.time` forces a server timestamp,
+        // so consent cannot be backdated or fabricated offline.
+        function isValidCreate() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['name', 'status', 'samplePath', 'consent', 'createdAt'])
+            && d.keys().hasAll(['name', 'status', 'samplePath', 'consent', 'createdAt'])
+            && d.name is string && d.name.size() > 0 && d.name.size() <= 60
+            && d.status == 'pending'
+            && d.samplePath is string
+            && d.samplePath.matches('users/' + uid + '/voiceSamples/[^/]+')
+            && d.consent.keys().hasOnly(['accepted', 'version', 'at'])
+            && d.consent.accepted == true
+            && d.consent.version is string && d.consent.version.size() <= 40
+            && d.consent.at == request.time
+            && d.createdAt == request.time;
+        }
+
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidCreate();
+        // Renames only — never status or elevenLabsVoiceId.
+        allow update: if isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 60;
+        // Deleting the doc directly would orphan the ElevenLabs voice (and keep
+        // it live on their side). deleteVoiceProfile is the only correct path.
+        allow delete: if false;
       }
 
-      // AI-generated stories owned by the user.
+      // AI-generated stories: written by generateStory, and the cached Claude
+      // moderation verdict publishStory relies on lives here — so the client
+      // gets read + delete only. A writable `moderation` field would be a
+      // one-line kid-safety bypass.
       match /generatedStories/{storyId} {
-        allow read, write: if isOwner(uid);
+        allow read, delete: if isOwner(uid);
+        allow create, update: if false;
       }
 
       // Cached narration metadata is written by Cloud Functions only.
@@ -56,10 +90,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Community-published stories. Readable by any signed-in user; all writes
-    // (the story, likes, comments) go through moderated Cloud Functions only.
+    // Community-published stories. All writes (the story, likes, comments) go
+    // through moderated Cloud Functions only.
     match /publishedStories/{storyId} {
-      allow read: if isSignedIn();
+      // Only *published* stories are readable: a story auto-hidden by reports
+      // (status "under_review") or taken down ("removed") must not stay
+      // reachable by direct doc id. Explore already filters on this field, so
+      // its list query is unaffected.
+      allow read: if isSignedIn() && resource.data.status == 'published';
       allow write: if false;
 
       match /likes/{uid} {
@@ -70,8 +108,17 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow write: if false;           // addComment Cloud Function only (moderated)
       }
-      match /reports/{reportId} {
-        allow create: if isSignedIn();   // users may flag content
+      // One report per user per story, enforced structurally: the doc id *is*
+      // the reporter's uid. Without this, three self-authored reports hit
+      // REPORT_HIDE_THRESHOLD and auto-hide anyone's story. A repeat report is
+      // an update, which stays denied, so onReportCreated can't be re-fired.
+      match /reports/{reporterUid} {
+        allow create: if isOwner(reporterUid)
+          && request.resource.data.keys().hasOnly(['reporterUid', 'reason', 'at'])
+          && request.resource.data.reporterUid == request.auth.uid
+          && request.resource.data.reason is string
+          && request.resource.data.reason.size() <= 300
+          && request.resource.data.at == request.time;
         allow read, update, delete: if false;
       }
     }

@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { onRequest } from "firebase-functions/v2/https";
@@ -33,7 +35,7 @@ export const revenueCatWebhook = onRequest(
       res.status(405).send("Method Not Allowed");
       return;
     }
-    if (req.get("Authorization") !== REVENUECAT_WEBHOOK_AUTH.value()) {
+    if (!isAuthorized(req.get("Authorization"))) {
       res.status(401).send("Unauthorized");
       return;
     }
@@ -68,3 +70,19 @@ export const revenueCatWebhook = onRequest(
     res.status(200).send("OK");
   },
 );
+
+/**
+ * Constant-time comparison of the Authorization header against the shared
+ * secret. A plain `!==` short-circuits at the first differing byte, which leaks
+ * the secret one byte at a time to anyone who can time the response — this
+ * endpoint is public, so that's a real attack, not a theoretical one.
+ */
+function isAuthorized(header: string | undefined): boolean {
+  const expected = REVENUECAT_WEBHOOK_AUTH.value();
+  // An unset secret must authorize nothing at all.
+  if (!expected || !header) return false;
+  const sent = Buffer.from(header);
+  const want = Buffer.from(expected);
+  // timingSafeEqual throws on differing lengths; the length is not the secret.
+  return sent.length === want.length && timingSafeEqual(sent, want);
+}

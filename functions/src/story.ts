@@ -3,7 +3,7 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
-import { requireAuth } from "./auth";
+import { requireVerifiedEmail } from "./auth";
 import { ANTHROPIC_API_KEY, ENFORCE_APP_CHECK, REGION, STORY_MODEL } from "./config";
 import { enforceQuota } from "./limits";
 
@@ -99,7 +99,7 @@ export const generateStory = onCall<GenerateStoryData>(
     enforceAppCheck: ENFORCE_APP_CHECK,
   },
   async (request) => {
-    const uid = requireAuth(request);
+    const uid = requireVerifiedEmail(request);
     await enforceQuota(uid, "generateStory");
     const { prompt, cleaned } = buildUserPrompt(request.data ?? {});
 

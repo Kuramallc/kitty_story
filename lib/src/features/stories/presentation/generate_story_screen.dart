@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../auth/presentation/verify_email_sheet.dart';
 import '../data/story_repository.dart';
 
 const _ageRanges = ['2-3 years', '4-5 years', '6-8 years'];
@@ -41,8 +42,10 @@ class _GenerateStoryScreenState extends ConsumerState<GenerateStoryScreen> {
           );
       if (mounted) context.pushReplacement('/stories/detail', extra: story);
     } catch (error) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      if (await showVerifyEmailIfNeeded(context, error)) return;
       if (mounted) {
-        setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not create the story: $error')),
         );

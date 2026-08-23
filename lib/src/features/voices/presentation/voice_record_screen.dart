@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../../auth/presentation/verify_email_sheet.dart';
 import '../application/recording_controller.dart';
 
 /// What the caregiver reads aloud. Starts with a spoken permission statement
@@ -73,11 +74,17 @@ class _VoiceRecordScreenState extends ConsumerState<VoiceRecordScreen> {
 
     ref.listen(recordingControllerProvider, (prev, next) {
       final message = next.errorMessage;
-      if (message != null && message != prev?.errorMessage) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(message)));
+      if (message == null || message == prev?.errorMessage) return;
+      // A rejection the user can actually act on gets the verify sheet; only
+      // genuinely unexpected failures show their exception text.
+      final cause = next.errorCause;
+      if (cause != null && isEmailNotVerified(cause)) {
+        showVerifyEmail(context);
+        return;
       }
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
     });
 
     final minutes = state.elapsed.inMinutes.toString().padLeft(2, '0');

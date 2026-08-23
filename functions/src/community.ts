@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 
 import Anthropic from "@anthropic-ai/sdk";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
-import { requireAuth } from "./auth";
+import { requireAuth, requireVerifiedEmail } from "./auth";
 import {
   ANTHROPIC_API_KEY,
   ENFORCE_APP_CHECK,
@@ -146,7 +146,7 @@ interface PrepareData { generatedStoryId: string }
 export const prepareStoryForPublish = onCall<PrepareData>(
   { ...BASE, secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 60, memory: "512MiB" },
   async (request) => {
-    const uid = requireAuth(request);
+    const uid = requireVerifiedEmail(request);
     const { ref, text, title } = await loadOwnedStory(uid, request.data?.generatedStoryId);
 
     const result = await moderateStory(title, text);
@@ -169,16 +169,25 @@ interface PublishData {
 export const publishStory = onCall<PublishData>(
   { ...BASE, secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 60, memory: "512MiB" },
   async (request) => {
-    const uid = requireAuth(request);
+    const uid = requireVerifiedEmail(request);
     const { ref: genRef, snap, text, title } = await loadOwnedStory(uid, request.data?.generatedStoryId);
 
     const existing = snap.get("publishedStoryId") as string | undefined;
     if (existing) return { publishedStoryId: existing, alreadyPublished: true };
     await enforceQuota(uid, "publishStory");
 
-    // Trust the cached moderation verdict if the text is unchanged; else re-check.
-    const cached = snap.get("moderation") as { safe?: boolean; textSha?: string } | undefined;
-    let safe = cached?.safe === true && cached?.textSha === sha(text);
+    // Reuse prepareStoryForPublish's verdict when the text is unchanged, else
+    // re-check. This is only safe because firestore.rules denies the client
+    // *every* write to generatedStories — otherwise forging
+    // `moderation: {safe: true, textSha: <sha of anything>}` would publish
+    // unmoderated text straight to other families' children. The `at` check
+    // makes a half-written doc re-moderate rather than sail through.
+    const cached = snap.get("moderation") as
+      | { safe?: boolean; textSha?: string; at?: unknown }
+      | undefined;
+    let safe = cached?.safe === true
+      && cached?.textSha === sha(text)
+      && cached?.at instanceof Timestamp;
     let proposed: Tags = { content: [], style: [], wisdom: [] };
     if (!safe) {
       const result = await moderateStory(title, text);
@@ -278,7 +287,7 @@ interface CommentData {
 export const addComment = onCall<CommentData>(
   { ...BASE, secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
   async (request) => {
-    const uid = requireAuth(request);
+    const uid = requireVerifiedEmail(request);
     await enforceQuota(uid, "addComment");
     const publishedStoryId = request.data?.publishedStoryId;
     const raw = request.data?.text;
