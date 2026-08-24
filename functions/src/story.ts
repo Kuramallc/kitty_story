@@ -18,20 +18,12 @@ interface GenerateStoryData {
 /** Keeps any single field from ballooning the prompt / bill. */
 const MAX_FIELD = 200;
 
-/** Guaranteed-valid shape for the model's response (structured outputs). */
-const STORY_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    title: { type: "string", description: "A short, gentle title (3-6 words)." },
-    text: {
-      type: "string",
-      description:
-        "The full bedtime story as plain prose; paragraphs separated by blank lines.",
-    },
-  },
-  required: ["title", "text"],
-};
+/**
+ * A story shorter than this is almost certainly not a real one — no bedtime
+ * story wraps up in under ~150 characters in any language. Triggers one retry
+ * (see the `attempts` loop below) rather than handing a stub to the user.
+ */
+const MIN_STORY_LENGTH = 150;
 
 /**
  * The kid-safety contract lives in the system prompt. Critically, on an unsafe
@@ -54,7 +46,31 @@ Style:
 - About 250-450 words. Gentle repetition is welcome.
 - End by guiding the child to relax, breathe slowly, and drift off to sleep.
 
-If a request asks for anything not safe for a young child, do NOT refuse and do NOT mention the request — simply write a safe, gentle bedtime story on a similar wholesome theme.`;
+If a request asks for anything not safe for a young child, do NOT refuse and do NOT mention the request — simply write a safe, gentle bedtime story on a similar wholesome theme.
+
+Output format — follow exactly, with nothing else before or after:
+- Line 1: just the title. No labels, quotes, numbering, or markdown (no "#", no "**").
+- Line 2: blank.
+- The rest: the story as plain prose, paragraphs separated by blank lines. No markdown.`;
+
+/**
+ * Splits the model's "title\n\nstory" response. Free text rather than the
+ * `json_schema` structured-output mode: that mode was cutting Chinese/Korean
+ * stories off after a sentence or two (the model would end the JSON string
+ * early, satisfying the schema with `stop_reason: "end_turn"` well short of
+ * the requested length) — reproduced consistently outside this app, so it's
+ * an Anthropic-side interaction between strict JSON-schema decoding and CJK
+ * output, not something a `minLength` schema constraint fixes. Plain text
+ * generation doesn't hit it.
+ */
+function parseStoryResponse(raw: string): { title: string; text: string } {
+  const trimmed = raw.trim();
+  const firstBreak = trimmed.indexOf("\n");
+  if (firstBreak === -1) return { title: "A Bedtime Story", text: trimmed };
+  const title = trimmed.slice(0, firstBreak).trim().replace(/^#+\s*|\*+/g, "");
+  const text = trimmed.slice(firstBreak + 1).trim();
+  return { title: title || "A Bedtime Story", text };
+}
 
 function clamp(value: unknown): string {
   return typeof value === "string" ? value.trim().slice(0, MAX_FIELD) : "";
@@ -149,8 +165,9 @@ function buildUserPrompt(data: GenerateStoryData): {
 
 /**
  * Generates a kid-safe bedtime story with Claude (STORY_MODEL), persists it to
- * users/{uid}/generatedStories, and returns it. Uses structured outputs so the
- * response is always valid `{title, text}` JSON.
+ * users/{uid}/generatedStories, and returns it. Plain-text generation, parsed
+ * with `parseStoryResponse` — see that function for why, not structured
+ * outputs.
  */
 export const generateStory = onCall<GenerateStoryData>(
   {
@@ -168,31 +185,31 @@ export const generateStory = onCall<GenerateStoryData>(
     logger.info("Generating story", { uid, model: STORY_MODEL, language });
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY.value() });
 
-    let title: string;
-    let text: string;
+    let title = "";
+    let text = "";
     try {
-      const response = await client.messages.create({
-        model: STORY_MODEL,
-        max_tokens: 2048,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: prompt }],
-        output_config: { format: { type: "json_schema", schema: STORY_SCHEMA } },
-      });
+      // One retry: the model occasionally cuts a story short for no reported
+      // error (stop_reason still "end_turn") — rare in plain-text mode, but
+      // cheap to guard against rather than handing the user a stub.
+      for (let attempt = 0; attempt < 2 && text.length < MIN_STORY_LENGTH; attempt++) {
+        const response = await client.messages.create({
+          model: STORY_MODEL,
+          max_tokens: 2048,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: prompt }],
+        });
 
-      if (response.stop_reason === "refusal") {
-        throw new HttpsError(
-          "failed-precondition",
-          "We couldn't create that story. Try a gentler theme.",
-        );
+        if (response.stop_reason === "refusal") {
+          throw new HttpsError(
+            "failed-precondition",
+            "We couldn't create that story. Try a gentler theme.",
+          );
+        }
+        const textBlock = response.content.find((b) => b.type === "text");
+        if (!textBlock || textBlock.type !== "text") continue;
+        ({ title, text } = parseStoryResponse(textBlock.text));
       }
-      const textBlock = response.content.find((b) => b.type === "text");
-      if (!textBlock || textBlock.type !== "text") {
-        throw new HttpsError("internal", "The story came back empty. Please try again.");
-      }
-      const parsed = JSON.parse(textBlock.text) as { title?: string; text?: string };
-      title = (parsed.title ?? "A Bedtime Story").trim();
-      text = (parsed.text ?? "").trim();
-      if (!text) {
+      if (!text || text.length < MIN_STORY_LENGTH) {
         throw new HttpsError("internal", "The story came back empty. Please try again.");
       }
     } catch (error) {
