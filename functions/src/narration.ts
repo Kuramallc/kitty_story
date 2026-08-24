@@ -5,10 +5,14 @@ import { getStorage } from "firebase-admin/storage";
 import * as logger from "firebase-functions/logger";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
-import { requireAuth } from "./auth";
+import { requireVerifiedEmail } from "./auth";
 import {
   ELEVENLABS_API_KEY,
   ENFORCE_APP_CHECK,
+  NARRATION_PACING_VERSION,
+  NARRATION_PARAGRAPH_PAUSE_SEC,
+  NARRATION_SENTENCE_PAUSE_SEC,
+  NARRATION_SPEED,
   REGION,
   TTS_MODEL,
   TTS_OUTPUT_FORMAT,
@@ -42,11 +46,16 @@ export const synthesizeNarration = onCall<SynthesizeNarrationData>(
     region: REGION,
     secrets: [ELEVENLABS_API_KEY],
     timeoutSeconds: 540,
-    memory: "1GiB",
+    // The whole story's mp3 is buffered in memory before upload — a long one is
+    // ~10MB, so 512MiB is ample (1GiB was idle overprovisioning).
+    memory: "512MiB",
+    // Keep one instance warm: a cold start added ~10s to the "Preparing…" wait,
+    // which was more than the TTS call itself on short narrations.
+    minInstances: 1,
     enforceAppCheck: ENFORCE_APP_CHECK,
   },
   async (request) => {
-    const uid = requireAuth(request);
+    const uid = requireVerifiedEmail(request);
     const { storyId, storySource, voiceId } = request.data ?? {};
     if (
       typeof storyId !== "string" || storyId.length === 0 ||
@@ -68,7 +77,11 @@ export const synthesizeNarration = onCall<SynthesizeNarrationData>(
 
     // Serve from cache when we already synthesized this (story, voice) pair.
     const cached = await narrationRef.get();
-    if (cached.exists && cached.get("status") === "ready") {
+    if (
+      cached.exists &&
+      cached.get("status") === "ready" &&
+      cached.get("pacingVersion") === NARRATION_PACING_VERSION
+    ) {
       return {
         narrationId,
         url: tokenUrl(bucket.name, cached.get("audioPath"), cached.get("downloadToken")),
@@ -96,9 +109,12 @@ export const synthesizeNarration = onCall<SynthesizeNarrationData>(
       uid, narrationId, characters: text.length,
     });
     const stream = await elevenLabsClient().textToSpeech.convert(elevenLabsVoiceId, {
-      text,
+      text: withBedtimePacing(text),
       modelId: TTS_MODEL,
       outputFormat: TTS_OUTPUT_FORMAT,
+      // Only the rate is overridden; everything else stays as the cloned
+      // voice's own settings.
+      voiceSettings: { speed: NARRATION_SPEED },
     });
     const audio = await streamToBuffer(stream);
 
@@ -118,6 +134,7 @@ export const synthesizeNarration = onCall<SynthesizeNarrationData>(
       audioPath,
       downloadToken,
       characterCount: text.length,
+      pacingVersion: NARRATION_PACING_VERSION,
       sizeBytes: audio.length,
       status: "ready",
       createdAt: FieldValue.serverTimestamp(),
@@ -126,6 +143,29 @@ export const synthesizeNarration = onCall<SynthesizeNarrationData>(
     return { narrationId, url: tokenUrl(bucket.name, audioPath, downloadToken), cached: false };
   },
 );
+
+/**
+ * Adds bedtime pacing: an explicit pause after every sentence and a longer one
+ * between paragraphs, so the story doesn't run together at bedtime.
+ *
+ * Works paragraph-by-paragraph so a paragraph break isn't also matched by the
+ * sentence rule (which would stack two pauses).
+ */
+function withBedtimePacing(text: string): string {
+  const sentence = `<break time="${NARRATION_SENTENCE_PAUSE_SEC}s" />`;
+  const paragraph = `<break time="${NARRATION_PARAGRAPH_PAUSE_SEC}s" />`;
+  return text
+    .trim()
+    .split(/\n\s*\n+/)
+    .map((para) =>
+      para
+        .replace(/\s*\n\s*/g, " ")          // soft-wrap newlines are not breaks
+        .replace(/([.!?…]["'”’)\]]?)\s+/g, `$1 ${sentence} `)
+        .trim(),
+    )
+    .filter((para) => para.length > 0)
+    .join(` ${paragraph} `);
+}
 
 /** Loads the story text for the given source, verifying it exists. */
 async function resolveStoryText(
@@ -145,6 +185,11 @@ async function resolveStoryText(
   const text = snapshot.get("text") as string | undefined;
   if (!snapshot.exists || !text) {
     throw new HttpsError("not-found", `Story ${storyId} (${source}) has no text.`);
+  }
+  // A community story auto-hidden by reports (or taken down) must not still be
+  // narratable through a cache miss.
+  if (source === "published" && snapshot.get("status") !== "published") {
+    throw new HttpsError("not-found", "This story is no longer available.");
   }
   return text;
 }

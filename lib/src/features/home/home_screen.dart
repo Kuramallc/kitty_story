@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../common/providers/firebase_providers.dart';
 import '../auth/data/auth_repository.dart';
+import '../auth/presentation/verify_email_banner.dart';
 
 /// Signed-in landing screen. Becomes the voice-profiles + story-library home
 /// in later phases; for now it confirms auth and links to the account screen.
@@ -57,6 +58,8 @@ class HomeScreen extends ConsumerWidget {
                 const _SetupNotice(),
                 const SizedBox(height: 16),
               ],
+              if (firebaseReady)
+                const VerifyEmailBanner(margin: EdgeInsets.only(bottom: 16)),
               FilledButton.icon(
                 onPressed:
                     firebaseReady ? () => context.push('/stories') : null,

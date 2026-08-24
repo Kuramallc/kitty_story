@@ -53,9 +53,18 @@ class CommunityRepository {
     );
   }
 
+  /// Loads a community story, or null when it is gone *or* no longer
+  /// published: the rules only expose `status == 'published'`, so a story
+  /// auto-hidden by reports reads back as permission-denied. A stale bookmark
+  /// is the common way to hit this.
   Future<PublishedStory?> fetchPublished(String id) async {
-    final doc = await _published.doc(id).get();
-    return doc.exists ? PublishedStory.fromDoc(doc) : null;
+    try {
+      final doc = await _published.doc(id).get();
+      return doc.exists ? PublishedStory.fromDoc(doc) : null;
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') return null;
+      rethrow;
+    }
   }
 
   /// Moderates a generated story + proposes tags for the publish editor.
@@ -112,14 +121,26 @@ class CommunityRepository {
         .call<Map<String, dynamic>>({'publishedStoryId': publishedStoryId, 'text': text});
   }
 
-  Future<void> report(String publishedStoryId, String reason) async {
+  /// Flags a community story. The report doc id *is* the reporter's uid, so a
+  /// second report from the same account is refused by the rules instead of
+  /// counting again toward the auto-hide threshold — otherwise three reports
+  /// from one person could hide anyone's story. Returns false when this user
+  /// had already reported it.
+  Future<bool> report(String publishedStoryId, String reason) async {
     final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
-    await _published.doc(publishedStoryId).collection('reports').add({
-      'reporterUid': uid,
-      'reason': reason,
-      'at': FieldValue.serverTimestamp(),
-    });
+    if (uid == null) return false;
+    try {
+      await _published.doc(publishedStoryId).collection('reports').doc(uid).set({
+        'reporterUid': uid,
+        'reason': reason,
+        'at': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } on FirebaseException catch (e) {
+      // A repeat report is an update, which the rules deny.
+      if (e.code == 'permission-denied') return false;
+      rethrow;
+    }
   }
 
   // --- Archive (client-managed bookmarks under users/{uid}/archived) ---

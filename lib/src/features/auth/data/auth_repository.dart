@@ -33,8 +33,41 @@ class AuthRepository {
   Future<UserCredential> registerWithEmail({
     required String email,
     required String password,
-  }) {
-    return _auth.createUserWithEmailAndPassword(email: email, password: password);
+  }) async {
+    final credential = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    // The backend gates every paid action on a verified address, so get the
+    // mail moving before the user ever hits that wall. Non-fatal: they can
+    // resend from the verify sheet.
+    try {
+      await credential.user?.sendEmailVerification();
+    } catch (_) {/* ignore */}
+    return credential;
+  }
+
+  /// Whether the signed-in user still needs to verify their email. Google and
+  /// Apple assert the address themselves, so only password signups can be
+  /// unverified — mirrors `requireVerifiedEmail` in functions/src/auth.ts.
+  bool get needsEmailVerification {
+    final user = _auth.currentUser;
+    if (user == null || user.emailVerified) return false;
+    return user.providerData.any((p) => p.providerId == 'password');
+  }
+
+  Future<void> sendEmailVerification() =>
+      _auth.currentUser?.sendEmailVerification() ?? Future<void>.value();
+
+  /// Re-reads the user *and* mints a fresh ID token. The reload alone isn't
+  /// enough: the cached token still carries `email_verified: false`, so Cloud
+  /// Functions would keep rejecting the call until it expired on its own.
+  Future<bool> refreshUser() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    await user.reload();
+    await _auth.currentUser?.getIdToken(true);
+    return _auth.currentUser?.emailVerified ?? false;
   }
 
   /// Interactive Google sign-in. Returns `null` if the user cancels.

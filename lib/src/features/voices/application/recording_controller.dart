@@ -22,6 +22,7 @@ class RecordingState {
     this.level = 0,
     this.filePath,
     this.errorMessage,
+    this.errorCause,
   });
 
   final RecordingPhase phase;
@@ -31,6 +32,11 @@ class RecordingState {
   final double level;
   final String? filePath;
   final String? errorMessage;
+
+  /// The raw failure behind [errorMessage], so the UI can recognise specific
+  /// backend rejections (an unverified email opens the verify sheet rather than
+  /// showing the exception text).
+  final Object? errorCause;
 
   bool get canSubmit =>
       phase == RecordingPhase.recorded &&
@@ -43,13 +49,16 @@ class RecordingState {
     double? level,
     String? filePath,
     String? errorMessage,
+    Object? errorCause,
   }) {
     return RecordingState(
       phase: phase ?? this.phase,
       elapsed: elapsed ?? this.elapsed,
       level: level ?? this.level,
       filePath: filePath ?? this.filePath,
+      // Errors are cleared, not carried forward, on every state change.
       errorMessage: errorMessage,
+      errorCause: errorCause,
     );
   }
 }
@@ -143,6 +152,7 @@ class RecordingController extends Notifier<RecordingState> {
       state = state.copyWith(
         phase: RecordingPhase.recorded,
         errorMessage: 'Could not create the voice: $error',
+        errorCause: error,
       );
       return false;
     }

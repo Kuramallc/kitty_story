@@ -34,6 +34,19 @@ export const TTS_MODEL = "eleven_multilingual_v2";
 /** mp3 44.1kHz 128kbps — good quality, small enough for mobile streaming. */
 export const TTS_OUTPUT_FORMAT = "mp3_44100_128" as const;
 
+// --- Bedtime narration pacing -------------------------------------------
+/** Speech rate: 1.0 is default, below 1.0 is slower and calmer. */
+export const NARRATION_SPEED = 0.92;
+/** Extra silence inserted after each sentence, in seconds. */
+export const NARRATION_SENTENCE_PAUSE_SEC = 0.55;
+/** Extra silence between paragraphs, in seconds. */
+export const NARRATION_PARAGRAPH_PAUSE_SEC = 1.0;
+/**
+ * Bump when pacing settings change: cached narrations recorded with an older
+ * value are re-synthesized instead of served stale.
+ */
+export const NARRATION_PACING_VERSION = 2;
+
 /** A community story auto-hides (status → "under_review") at this many reports. */
 export const REPORT_HIDE_THRESHOLD = 3;
 

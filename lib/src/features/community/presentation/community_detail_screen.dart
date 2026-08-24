@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/presentation/verify_email_sheet.dart';
 import '../../player/presentation/tell_in_voice.dart';
 import '../data/community_repository.dart';
 import '../domain/published_story.dart';
@@ -115,10 +116,14 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
       ),
     );
     if (reason == null) return;
-    await _repo.report(widget.storyId, reason);
+    final accepted = await _repo.report(widget.storyId, reason);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Thanks — we\'ll take a look.')),
+        SnackBar(
+          content: Text(accepted
+              ? 'Thanks — we\'ll take a look.'
+              : "Thanks — you've already reported this story."),
+        ),
       );
     }
   }
@@ -288,7 +293,10 @@ class _CommentSheetState extends ConsumerState<_CommentSheet> {
       await ref.read(communityRepositoryProvider).addComment(widget.storyId, text);
       _ctrl.clear();
     } catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(_friendlyComment(error))));
+      if (!mounted) return;
+      if (!await showVerifyEmailIfNeeded(context, error)) {
+        messenger.showSnackBar(SnackBar(content: Text(_friendlyComment(error))));
+      }
     } finally {
       if (mounted) setState(() => _posting = false);
     }

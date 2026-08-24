@@ -49,4 +49,5 @@ app.*.map.json
 *-debug.log
 .runtimeconfig.json
 /functions/node_modules/
+/firestore-tests/node_modules/
 /functions/lib/

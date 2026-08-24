@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../auth/presentation/verify_email_sheet.dart';
 import '../../stories/domain/story.dart';
 import '../data/community_repository.dart';
 import '../domain/published_story.dart';
@@ -45,7 +46,15 @@ class _PublishTagsScreenState extends ConsumerState<PublishTagsScreen> {
         _wisdom..clear()..addAll(result.tags.wisdom);
         _loading = false;
       });
-    } catch (_) {
+    } catch (error) {
+      if (!mounted) return;
+      // Keep the spinner up while the verify sheet is open: dropping _loading
+      // first would flash the "isn't suitable for young children" screen behind
+      // it, which is the wrong reason entirely.
+      if (await showVerifyEmailIfNeeded(context, error)) {
+        if (mounted) context.pop(); // back to the story, ready to retry
+        return;
+      }
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -71,8 +80,10 @@ class _PublishTagsScreenState extends ConsumerState<PublishTagsScreen> {
         const SnackBar(content: Text('Published to the community 🎉')),
       );
     } catch (error) {
+      if (!mounted) return;
+      setState(() => _publishing = false);
+      if (await showVerifyEmailIfNeeded(context, error)) return;
       if (mounted) {
-        setState(() => _publishing = false);
         messenger.showSnackBar(SnackBar(content: Text(_friendly(error))));
       }
     }
