@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import LanguageDetect from "languagedetect";
 
 import { requireVerifiedEmail } from "./auth";
 import { ANTHROPIC_API_KEY, ENFORCE_APP_CHECK, REGION, STORY_MODEL } from "./config";
@@ -17,20 +18,12 @@ interface GenerateStoryData {
 /** Keeps any single field from ballooning the prompt / bill. */
 const MAX_FIELD = 200;
 
-/** Guaranteed-valid shape for the model's response (structured outputs). */
-const STORY_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    title: { type: "string", description: "A short, gentle title (3-6 words)." },
-    text: {
-      type: "string",
-      description:
-        "The full bedtime story as plain prose; paragraphs separated by blank lines.",
-    },
-  },
-  required: ["title", "text"],
-};
+/**
+ * A story shorter than this is almost certainly not a real one — no bedtime
+ * story wraps up in under ~150 characters in any language. Triggers one retry
+ * (see the `attempts` loop below) rather than handing a stub to the user.
+ */
+const MIN_STORY_LENGTH = 150;
 
 /**
  * The kid-safety contract lives in the system prompt. Critically, on an unsafe
@@ -53,20 +46,99 @@ Style:
 - About 250-450 words. Gentle repetition is welcome.
 - End by guiding the child to relax, breathe slowly, and drift off to sleep.
 
-If a request asks for anything not safe for a young child, do NOT refuse and do NOT mention the request — simply write a safe, gentle bedtime story on a similar wholesome theme.`;
+If a request asks for anything not safe for a young child, do NOT refuse and do NOT mention the request — simply write a safe, gentle bedtime story on a similar wholesome theme.
+
+Output format — follow exactly, with nothing else before or after:
+- Line 1: just the title. No labels, quotes, numbering, or markdown (no "#", no "**").
+- Line 2: blank.
+- The rest: the story as plain prose, paragraphs separated by blank lines. No markdown.`;
+
+/**
+ * Splits the model's "title\n\nstory" response. Free text rather than the
+ * `json_schema` structured-output mode: that mode was cutting Chinese/Korean
+ * stories off after a sentence or two (the model would end the JSON string
+ * early, satisfying the schema with `stop_reason: "end_turn"` well short of
+ * the requested length) — reproduced consistently outside this app, so it's
+ * an Anthropic-side interaction between strict JSON-schema decoding and CJK
+ * output, not something a `minLength` schema constraint fixes. Plain text
+ * generation doesn't hit it.
+ */
+function parseStoryResponse(raw: string): { title: string; text: string } {
+  const trimmed = raw.trim();
+  const firstBreak = trimmed.indexOf("\n");
+  if (firstBreak === -1) return { title: "A Bedtime Story", text: trimmed };
+  const title = trimmed.slice(0, firstBreak).trim().replace(/^#+\s*|\*+/g, "");
+  const text = trimmed.slice(firstBreak + 1).trim();
+  return { title: title || "A Bedtime Story", text };
+}
 
 function clamp(value: unknown): string {
   return typeof value === "string" ? value.trim().slice(0, MAX_FIELD) : "";
 }
 
+const languageDetector = new LanguageDetect();
+
+/**
+ * Below this many characters of combined free text, language detection is
+ * unreliable (a single name can score higher for Tagalog than English) — skip
+ * it and fall through to the model's default.
+ */
+const MIN_DETECTION_CHARS = 8;
+/** languagedetect's own confidence score for its top guess; below this, don't trust it. */
+const MIN_DETECTION_CONFIDENCE = 0.1;
+
+/**
+ * Non-Latin scripts are unambiguous by Unicode block, which is far more
+ * reliable on short prompt text than `languagedetect`'s n-gram model — that
+ * package only knows Latin/Cyrillic-alphabet languages and returns nothing
+ * useful for e.g. Chinese or Arabic. Checked in order, first match wins:
+ * Japanese before Chinese since Japanese text almost always mixes in kana
+ * even when it's mostly kanji, and Ukrainian-only Cyrillic letters before
+ * plain Cyrillic (which defaults to Russian, the most common case).
+ */
+const SCRIPT_LANGUAGES: [RegExp, string][] = [
+  [/\p{Script=Hiragana}|\p{Script=Katakana}/u, "Japanese"],
+  [/\p{Script=Han}/u, "Chinese"],
+  [/\p{Script=Hangul}/u, "Korean"],
+  [/\p{Script=Arabic}/u, "Arabic"],
+  [/\p{Script=Hebrew}/u, "Hebrew"],
+  [/\p{Script=Devanagari}/u, "Hindi"],
+  [/\p{Script=Bengali}/u, "Bengali"],
+  [/\p{Script=Thai}/u, "Thai"],
+  [/\p{Script=Greek}/u, "Greek"],
+  [/[іїєґ]/i, "Ukrainian"],
+  [/\p{Script=Cyrillic}/u, "Russian"],
+  [/[đơư]|[ạảãầấẩẫậằắẳẵặẹẻẽềếệểễịỉĩọỏõồốộổỗờớợởỡụủũừứựửữỳỷỹ]/i, "Vietnamese"],
+];
+
+/**
+ * Detects the dominant language of the user's free-text request (theme +
+ * characters — childName is a proper noun and carries no language signal, so
+ * it's excluded to avoid skewing the result) and returns its English name
+ * (e.g. "Spanish"), or null if there isn't enough text to tell.
+ */
+function detectPreferredLanguage(theme: string, characters: string): string | null {
+  const text = [theme, characters].filter(Boolean).join(". ");
+  if (text.length < MIN_DETECTION_CHARS) return null;
+  for (const [pattern, name] of SCRIPT_LANGUAGES) {
+    if (pattern.test(text)) return name;
+  }
+  const [top] = languageDetector.detect(text, 1);
+  if (!top || top[1] < MIN_DETECTION_CONFIDENCE) return null;
+  const [name] = top;
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
 function buildUserPrompt(data: GenerateStoryData): {
   prompt: string;
   cleaned: GenerateStoryData;
+  language: string | null;
 } {
   const childName = clamp(data.childName);
   const theme = clamp(data.theme);
   const characters = clamp(data.characters);
   const ageRange = clamp(data.ageRange);
+  const language = detectPreferredLanguage(theme, characters);
 
   const lines = ["Please write a bedtime story."];
   if (childName) {
@@ -78,17 +150,24 @@ function buildUserPrompt(data: GenerateStoryData): {
   if (!theme && !characters) {
     lines.push("If no theme is given, write about a sleepy little kitten getting cozy for bed.");
   }
+  // The user's preferred language, inferred from what they typed above — write
+  // the whole story in it rather than defaulting to English.
+  if (language) {
+    lines.push(`Write the entire story — both the title and the text — in ${language}, since that's the language the request above was written in.`);
+  }
 
   return {
     prompt: lines.join("\n"),
     cleaned: { childName, theme, characters, ageRange },
+    language,
   };
 }
 
 /**
  * Generates a kid-safe bedtime story with Claude (STORY_MODEL), persists it to
- * users/{uid}/generatedStories, and returns it. Uses structured outputs so the
- * response is always valid `{title, text}` JSON.
+ * users/{uid}/generatedStories, and returns it. Plain-text generation, parsed
+ * with `parseStoryResponse` — see that function for why, not structured
+ * outputs.
  */
 export const generateStory = onCall<GenerateStoryData>(
   {
@@ -101,36 +180,36 @@ export const generateStory = onCall<GenerateStoryData>(
   async (request) => {
     const uid = requireVerifiedEmail(request);
     await enforceQuota(uid, "generateStory");
-    const { prompt, cleaned } = buildUserPrompt(request.data ?? {});
+    const { prompt, cleaned, language } = buildUserPrompt(request.data ?? {});
 
-    logger.info("Generating story", { uid, model: STORY_MODEL });
+    logger.info("Generating story", { uid, model: STORY_MODEL, language });
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY.value() });
 
-    let title: string;
-    let text: string;
+    let title = "";
+    let text = "";
     try {
-      const response = await client.messages.create({
-        model: STORY_MODEL,
-        max_tokens: 2048,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: prompt }],
-        output_config: { format: { type: "json_schema", schema: STORY_SCHEMA } },
-      });
+      // One retry: the model occasionally cuts a story short for no reported
+      // error (stop_reason still "end_turn") — rare in plain-text mode, but
+      // cheap to guard against rather than handing the user a stub.
+      for (let attempt = 0; attempt < 2 && text.length < MIN_STORY_LENGTH; attempt++) {
+        const response = await client.messages.create({
+          model: STORY_MODEL,
+          max_tokens: 2048,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: prompt }],
+        });
 
-      if (response.stop_reason === "refusal") {
-        throw new HttpsError(
-          "failed-precondition",
-          "We couldn't create that story. Try a gentler theme.",
-        );
+        if (response.stop_reason === "refusal") {
+          throw new HttpsError(
+            "failed-precondition",
+            "We couldn't create that story. Try a gentler theme.",
+          );
+        }
+        const textBlock = response.content.find((b) => b.type === "text");
+        if (!textBlock || textBlock.type !== "text") continue;
+        ({ title, text } = parseStoryResponse(textBlock.text));
       }
-      const textBlock = response.content.find((b) => b.type === "text");
-      if (!textBlock || textBlock.type !== "text") {
-        throw new HttpsError("internal", "The story came back empty. Please try again.");
-      }
-      const parsed = JSON.parse(textBlock.text) as { title?: string; text?: string };
-      title = (parsed.title ?? "A Bedtime Story").trim();
-      text = (parsed.text ?? "").trim();
-      if (!text) {
+      if (!text || text.length < MIN_STORY_LENGTH) {
         throw new HttpsError("internal", "The story came back empty. Please try again.");
       }
     } catch (error) {
@@ -147,6 +226,7 @@ export const generateStory = onCall<GenerateStoryData>(
       title,
       text,
       prompt: cleaned,
+      language: language ?? "English",
       source: "generated",
       model: STORY_MODEL,
       status: "ready",
