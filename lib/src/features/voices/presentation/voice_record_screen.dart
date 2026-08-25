@@ -62,7 +62,11 @@ class _VoiceRecordScreenState extends ConsumerState<VoiceRecordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Creating "${widget.voiceName}" — this takes a minute.')),
       );
-      context.go('/voices');
+      // Pop back through consent + record (rather than context.go, which
+      // would replace the whole stack) so the Voices screen we land on is
+      // the one already pushed from Home — keeping its back button intact.
+      context.pop();
+      context.pop();
     }
   }
 
