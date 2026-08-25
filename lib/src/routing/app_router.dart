@@ -9,10 +9,14 @@ import '../features/home/home_screen.dart';
 import '../features/voices/presentation/voice_consent_screen.dart';
 import '../features/voices/presentation/voice_record_screen.dart';
 import '../features/voices/presentation/voices_screen.dart';
+import '../features/stories/data/story_repository.dart';
 import '../features/stories/domain/story.dart';
 import '../features/stories/presentation/generate_story_screen.dart';
 import '../features/stories/presentation/stories_screen.dart';
+import '../features/stories/presentation/story_cards.dart';
 import '../features/stories/presentation/story_detail_screen.dart';
+import '../features/stories/presentation/story_section_list_screen.dart';
+import '../features/community/data/community_repository.dart';
 import '../features/player/presentation/player_screen.dart';
 import '../features/community/domain/published_story.dart';
 import '../features/community/presentation/community_detail_screen.dart';
@@ -90,6 +94,36 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/stories/detail',
         name: 'storyDetail',
         builder: (context, state) => StoryDetailScreen(story: state.extra as Story),
+      ),
+      GoRoute(
+        path: '/stories/created',
+        name: 'storiesCreated',
+        builder: (context, state) => SectionListScreen<Story>(
+          title: 'Created by me',
+          watch: (ref) => ref.watch(myStoriesProvider),
+          cardBuilder: (s) => StoryCard(story: s),
+          emptyMessage: 'Stories you\'ve made will appear here.',
+        ),
+      ),
+      GoRoute(
+        path: '/stories/community',
+        name: 'storiesCommunity',
+        builder: (context, state) => SectionListScreen<ArchivedStory>(
+          title: 'Community',
+          watch: (ref) => ref.watch(archivedStoriesProvider),
+          cardBuilder: (i) => ArchivedStoryCard(item: i),
+          emptyMessage: 'Tap Play on a story in Explore to save it here.',
+        ),
+      ),
+      GoRoute(
+        path: '/stories/sample',
+        name: 'storiesSample',
+        builder: (context, state) => SectionListScreen<Story>(
+          title: 'Sample',
+          watch: (ref) => ref.watch(libraryStoriesProvider),
+          cardBuilder: (s) => StoryCard(story: s),
+          emptyMessage: 'Curated stories will appear here.',
+        ),
       ),
       GoRoute(
         path: '/player',

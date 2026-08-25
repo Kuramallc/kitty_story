@@ -7,6 +7,11 @@ import '../../community/data/community_repository.dart';
 import '../../community/domain/published_story.dart';
 import '../data/story_repository.dart';
 import '../domain/story.dart';
+import 'story_cards.dart';
+
+/// Sections show at most this many stories inline; the rest are behind
+/// that section's "View all" button.
+const int _kSectionPreviewCount = 3;
 
 /// The unified Library: one scrolling view of collapsible sections, in order:
 ///   • **Created by me** — the user's AI-generated stories. Pinned to the top,
@@ -50,8 +55,10 @@ class _LibraryView extends ConsumerWidget {
         : CollapsibleSection(
             title: 'Created by me',
             subtitle: 'Stories you\'ve made',
-            child: _CardColumn(
-              children: [for (final s in createdStories) _StoryCard(story: s)],
+            child: _SectionPreview<Story>(
+              items: createdStories,
+              cardBuilder: (s) => StoryCard(story: s),
+              viewAllRoute: '/stories/created',
             ),
           );
 
@@ -65,7 +72,11 @@ class _LibraryView extends ConsumerWidget {
         data: (list) => list.isEmpty
             ? const _SectionMessage(
                 'Tap Play on a story in Explore to save it here.')
-            : _CardColumn(children: [for (final i in list) _ArchivedCard(item: i)]),
+            : _SectionPreview<ArchivedStory>(
+                items: list,
+                cardBuilder: (i) => ArchivedStoryCard(item: i),
+                viewAllRoute: '/stories/community',
+              ),
       ),
     );
 
@@ -78,7 +89,11 @@ class _LibraryView extends ConsumerWidget {
         error: (_, _) => const _SectionMessage('Could not load sample stories.'),
         data: (list) => list.isEmpty
             ? const _SectionMessage('Curated stories will appear here.')
-            : _CardColumn(children: [for (final s in list) _StoryCard(story: s)]),
+            : _SectionPreview<Story>(
+                items: list,
+                cardBuilder: (s) => StoryCard(story: s),
+                viewAllRoute: '/stories/sample',
+              ),
       ),
     );
 
@@ -100,82 +115,40 @@ class _LibraryView extends ConsumerWidget {
   }
 }
 
-/// Stacks cards with consistent spacing inside a collapsible section.
-class _CardColumn extends StatelessWidget {
-  const _CardColumn({required this.children});
+/// The first [_kSectionPreviewCount] cards of a section, plus a "View all"
+/// button underneath when there are more than that to see.
+class _SectionPreview<T> extends StatelessWidget {
+  const _SectionPreview({
+    super.key,
+    required this.items,
+    required this.cardBuilder,
+    required this.viewAllRoute,
+  });
 
-  final List<Widget> children;
+  final List<T> items;
+  final Widget Function(T item) cardBuilder;
+  final String viewAllRoute;
 
   @override
   Widget build(BuildContext context) {
+    final visible = items.take(_kSectionPreviewCount).toList();
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final child in children)
-          Padding(padding: const EdgeInsets.only(bottom: 12), child: child),
+        for (final item in visible)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: cardBuilder(item),
+          ),
+        if (items.length > _kSectionPreviewCount)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => context.push(viewAllRoute),
+              child: const Text('View all'),
+            ),
+          ),
       ],
-    );
-  }
-}
-
-class _StoryCard extends StatelessWidget {
-  const _StoryCard({required this.story});
-
-  final Story story;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final preview = story.text.replaceAll('\n', ' ');
-    return Card(
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: CircleAvatar(
-          backgroundColor: theme.colorScheme.secondaryContainer,
-          child: Icon(
-            story.source == StorySource.library
-                ? Icons.menu_book_outlined
-                : Icons.auto_awesome,
-            color: theme.colorScheme.onSecondaryContainer,
-          ),
-        ),
-        title: Text(story.title, style: theme.textTheme.titleMedium),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            preview,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-          ),
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => context.push('/stories/detail', extra: story),
-      ),
-    );
-  }
-}
-
-class _ArchivedCard extends StatelessWidget {
-  const _ArchivedCard({required this.item});
-
-  final ArchivedStory item;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final tags = item.tags.all.take(3).join(' · ');
-    return Card(
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: theme.colorScheme.secondaryContainer,
-          child: Icon(Icons.bookmark, color: theme.colorScheme.onSecondaryContainer),
-        ),
-        title: Text(item.title, style: theme.textTheme.titleMedium),
-        subtitle: tags.isEmpty ? null : Text(tags),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => context.push('/explore/story/${item.publishedStoryId}'),
-      ),
     );
   }
 }
