@@ -27,5 +27,13 @@ service firebase.storage {
       allow read: if true;
       allow write: if false;
     }
+
+    // Shared, non-sensitive fixture audio used by integration tests, so it
+    // doesn't need to ship inside every app install. Any signed-in user may
+    // read; uploaded out-of-band, never by the client.
+    match /test_fixtures/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
   }
 }

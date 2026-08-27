@@ -77,11 +77,6 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  assets:
-    # Synthetic voice sample used by integration_test/voice_clone_test.dart.
-    # TODO(Phase 5): exclude from release builds.
-    - assets/test_fixtures/
-
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

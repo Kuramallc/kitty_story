@@ -1,12 +1,9 @@
-import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:just_audio/just_audio.dart';
@@ -14,7 +11,8 @@ import 'package:kitty_story/firebase_options.dart';
 import 'package:kitty_story/src/features/community/data/community_repository.dart';
 import 'package:kitty_story/src/features/stories/data/story_repository.dart';
 import 'package:kitty_story/src/features/voices/data/voice_repository.dart';
-import 'package:path_provider/path_provider.dart';
+
+import 'test_fixtures.dart';
 
 /// Live Phase 4.5 check: generate a story → moderate + propose tags → publish →
 /// find it in Explore → like → comment (moderated; an unsafe comment is
@@ -55,10 +53,7 @@ void main() {
     String? publishedId;
     try {
       // Clone a voice (for the narration step).
-      final bytes = await rootBundle.load('assets/test_fixtures/voice_sample.m4a');
-      final dir = await getTemporaryDirectory();
-      final sample = File('${dir.path}/voice_sample.m4a');
-      await sample.writeAsBytes(bytes.buffer.asUint8List());
+      final sample = await downloadVoiceSampleFixture();
       voiceId = await voices.createVoiceAndClone(name: 'Test Gran', sample: sample);
       final voiceRef = FirebaseFirestore.instance
           .collection('users').doc(user.uid).collection('voices').doc(voiceId);
