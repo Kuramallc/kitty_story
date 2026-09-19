@@ -171,13 +171,24 @@ by the app — it must never get App Check. It's guarded by the shared secret in
   `--dart-define=GOOGLE_SERVER_CLIENT_ID=xxxx.apps.googleusercontent.com`.
 
 ### Pre-store-submission checklist (deferred)
-- **Stop shipping the test voice sample:** remove `assets/test_fixtures/` from
-  [`pubspec.yaml`](pubspec.yaml); upload `voice_sample.m4a` to Storage
-  (`test_fixtures/voice_sample.m4a`) and have the integration tests download it
-  (add a `test_fixtures` read rule to `storage.rules`). 205 KB, non-sensitive, so
-  safe to defer until submission.
-- **App icon:** add `flutter_launcher_icons` with final art (a twilight-moon
-  matching the in-app logo).
+- **Stop shipping the test voice sample:** still outstanding. `pubspec.yaml`
+  bundles `assets/test_fixtures/` and all four integration tests still
+  `rootBundle.load('assets/test_fixtures/voice_sample.m4a')`. To close it:
+  upload the file to Storage (`test_fixtures/voice_sample.m4a`), add a
+  signed-in-only read rule to `storage.rules`, switch the tests to download it,
+  then drop the asset entry. 205 KB, non-sensitive, so safe to defer — but it
+  is *not* done yet.
+- ~~**App icon**~~ — done. `flutter_launcher_icons` generates both platforms'
+  icons from `assets/icon/icon.png`.
+- **Versioning:** `pubspec.yaml`'s `version:` field (currently `1.0.0+3`) is
+  the only file you hand-edit for a release. `android/local.properties` also
+  has `flutter.versionName`/`flutter.versionCode`, but that file is
+  gitignored and machine-local — `flutter build`/`flutter run` overwrites it
+  from `pubspec.yaml` on every invocation, *before* Gradle runs. The only way
+  it goes stale is building Android without the `flutter` CLI (raw
+  `./gradlew`, or Android Studio's "Generate Signed Bundle" menu) — always
+  release via `flutter build appbundle` / `flutter build ipa` and this never
+  comes up.
 
 ## 6. Security model (what enforces what)
 
