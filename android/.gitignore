@@ -12,3 +12,8 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Android Studio writes this opaque per-machine registration token into
+# src/main/assets/, which means it would be bundled into every APK. Nothing in
+# the build references it.
+**/adi-registration.properties
