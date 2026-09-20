@@ -52,6 +52,7 @@ dependencies:
   audio_service: ^0.18.18
   audio_session: ^0.2.3
   purchases_flutter: ^10.2.3
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
