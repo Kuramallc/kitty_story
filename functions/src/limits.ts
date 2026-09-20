@@ -79,7 +79,7 @@ export async function enforceVoiceLimit(uid: string, currentVoiceId: string): Pr
   if (others >= FREE_MAX_VOICES) {
     throw new HttpsError(
       "resource-exhausted",
-      `The free plan includes ${FREE_MAX_VOICES} voices. Upgrade for unlimited voices.`,
+      `The free plan includes ${FREE_MAX_VOICES} ${FREE_MAX_VOICES === 1 ? "voice" : "voices"}. Upgrade for unlimited voices.`,
     );
   }
 }

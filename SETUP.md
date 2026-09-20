@@ -171,13 +171,23 @@ by the app — it must never get App Check. It's guarded by the shared secret in
   `--dart-define=GOOGLE_SERVER_CLIENT_ID=xxxx.apps.googleusercontent.com`.
 
 ### Pre-store-submission checklist (deferred)
-- **Stop shipping the test voice sample:** still outstanding. `pubspec.yaml`
-  bundles `assets/test_fixtures/` and all four integration tests still
-  `rootBundle.load('assets/test_fixtures/voice_sample.m4a')`. To close it:
-  upload the file to Storage (`test_fixtures/voice_sample.m4a`), add a
-  signed-in-only read rule to `storage.rules`, switch the tests to download it,
-  then drop the asset entry. 205 KB, non-sensitive, so safe to defer — but it
-  is *not* done yet.
+- ~~**Stop shipping the test voice sample**~~ — done. `voice_sample.m4a` now
+  lives in Storage behind a signed-in read rule; `integration_test/test_fixtures.dart`
+  downloads it, and the asset entry is out of `pubspec.yaml`.
+- ~~**In-app account deletion**~~ — done. Account → *Delete my account* calls
+  the `deleteAccount` function, which tears down ElevenLabs voices, Storage,
+  the Firestore subtree, community posts, and the auth record. Required by
+  App Store 5.1.1(v) and Google Play; the web request form at
+  kuramallc.com/home/support/kittystory satisfies Play's *separate* web-URL
+  requirement, not the in-app one.
+- ~~**Paywall disclosures**~~ — done. Terms of Use + Privacy Policy links and
+  the auto-renewal statement now render on the paywall, as guideline 3.1.2
+  requires. URLs live in `lib/src/common/legal_urls.dart`.
+- ~~**Export compliance**~~ — done. `ITSAppUsesNonExemptEncryption = false` in
+  `ios/Runner/Info.plist` (HTTPS only), so uploads stop prompting.
+- **Still open before submission:** set the real `REVENUECAT_WEBHOOK_AUTH`
+  secret (entitlements will not sync while it is a placeholder), and produce a
+  signed `flutter build ipa` / `appbundle` with the RevenueCat keys.
 - ~~**App icon**~~ — done. `flutter_launcher_icons` generates both platforms'
   icons from `assets/icon/icon.png`.
 - **Versioning:** `pubspec.yaml`'s `version:` field (currently `1.0.0+3`) is

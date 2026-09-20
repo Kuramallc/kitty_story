@@ -52,8 +52,8 @@ export const REPORT_HIDE_THRESHOLD = 3;
 
 // --- Plan limits ---------------------------------------------------------
 /** Free-tier caps, lifted by an active subscription. */
-export const FREE_MAX_VOICES = 3;
-export const FREE_PLAYS_PER_WEEK = 5;
+export const FREE_MAX_VOICES = 1;
+export const FREE_PLAYS_PER_WEEK = 2;
 /** Abuse caps — apply to everyone (incl. subscribers) as a cost backstop. */
 export const ABUSE_GENERATE_PER_DAY = 20;
 export const ABUSE_NARRATE_PER_DAY = 100;

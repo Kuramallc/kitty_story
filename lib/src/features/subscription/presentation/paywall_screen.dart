@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../common/legal_urls.dart';
 import '../data/subscription_repository.dart';
 
 /// Shows the upgrade paywall as a bottom sheet. [reason] is an optional line
@@ -168,12 +170,59 @@ class _PaywallSheetState extends ConsumerState<_PaywallSheet> {
                     onPressed: _busy ? null : _restore,
                     child: const Text('Restore purchases'),
                   ),
+                  const SizedBox(height: 4),
+                  _SubscriptionTerms(price: price),
                 ],
               );
             },
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The disclosures App Store guideline 3.1.2 requires on the paywall itself:
+/// length, price per period, auto-renewal, and working Terms + Privacy links.
+class _SubscriptionTerms extends StatelessWidget {
+  const _SubscriptionTerms({required this.price});
+
+  final String price;
+
+  Future<void> _open(String url) async {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall
+        ?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    return Column(
+      children: [
+        Text(
+          'Kitty Story Unlimited is a $price/month subscription that renews '
+          'automatically until cancelled. Cancel any time, at least 24 hours '
+          'before the period ends, in your store account settings.',
+          textAlign: TextAlign.center,
+          style: muted,
+        ),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextButton(
+              onPressed: () => _open(kTermsOfUseUrl),
+              child: const Text('Terms of Use'),
+            ),
+            Text('·', style: muted),
+            TextButton(
+              onPressed: () => _open(kPrivacyPolicyUrl),
+              child: const Text('Privacy Policy'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

@@ -1,7 +1,9 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import '../../voices/data/voice_repository.dart' show kFunctionsRegion;
 
 /// OAuth **web** client id (Firebase console → Project settings → your apps, or
 /// `google-services.json` `client_type: 3`). Required on Android for Google
@@ -121,6 +123,23 @@ class AuthRepository {
       accessToken: apple.authorizationCode,
     );
     return _auth.signInWithCredential(credential);
+  }
+
+  /// Permanently deletes the signed-in account and everything attached to it:
+  /// cloned voices (including at ElevenLabs), stories, narration audio,
+  /// community posts, and the sign-in record itself.
+  ///
+  /// The backend does the teardown and removes the auth user last, so a
+  /// mid-way failure leaves the account intact and retryable. Afterwards the
+  /// local session is cleared, which drops the app back to sign-in.
+  Future<void> deleteAccount() async {
+    await FirebaseFunctions.instanceFor(region: kFunctionsRegion)
+        .httpsCallable(
+          'deleteAccount',
+          options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
+        )
+        .call<Map<String, dynamic>>();
+    await signOut();
   }
 
   Future<void> signOut() async {
