@@ -35,7 +35,7 @@ const String kUnlimitedEntitlement = 'unlimited';
 
 /// Free-tier voice-profile cap (mirrors FREE_MAX_VOICES in functions/config.ts);
 /// used to gate the "Add a voice" button before recording.
-const int kFreeMaxVoices = 3;
+const int kFreeMaxVoices = 1;
 
 /// True when the configured key can't be used in this build. A `test_…` Test
 /// Store key is **debug-only** — the native SDK hard-fails on it in a release

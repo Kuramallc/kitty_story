@@ -98,7 +98,8 @@ class _VoicesScreenState extends ConsumerState<VoicesScreen> {
     final count = ref.read(voicesStreamProvider).value?.length ?? 0;
     if (!entitled && count >= kFreeMaxVoices) {
       await showPaywall(context,
-          reason: 'The free plan includes $kFreeMaxVoices voices.');
+          reason: 'The free plan includes $kFreeMaxVoices '
+              '${kFreeMaxVoices == 1 ? 'voice' : 'voices'}.');
       return;
     }
     // Parental gate before recording a voice.
