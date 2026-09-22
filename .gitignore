@@ -50,6 +50,13 @@ app.*.map.json
 *.jks
 *.keystore
 
+# Apple private keys — App Store Connect API and In-App Purchase keys.
+# These grant API access to the developer account and can only be downloaded
+# once. This repo is public; never commit them.
+*.p8
+**/AuthKey_*.p8
+**/SubscriptionKey_*.p8
+
 # Firebase
 .firebase/
 *-debug.log
