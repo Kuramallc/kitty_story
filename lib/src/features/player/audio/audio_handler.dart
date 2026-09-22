@@ -38,7 +38,7 @@ class StoryAudioHandler extends BaseAudioHandler {
     required String title,
     String? subtitle,
   }) async {
-    mediaItem.add(MediaItem(id: url, title: title, album: subtitle ?? 'Kitty Story'));
+    mediaItem.add(MediaItem(id: url, title: title, album: subtitle ?? 'Kitty Stories'));
     if (_currentUrl != url) {
       _currentUrl = url;
       await _player.setUrl(url);

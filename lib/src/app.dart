@@ -15,7 +15,7 @@ class KittyStoryApp extends ConsumerWidget {
     // Keep RevenueCat's identified user in sync with Firebase auth.
     ref.watch(subscriptionSyncProvider);
     return MaterialApp.router(
-      title: 'Kitty Story',
+      title: 'Kitty Stories',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,

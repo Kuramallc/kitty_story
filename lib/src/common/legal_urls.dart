@@ -9,7 +9,7 @@ library;
 const String kPrivacyPolicyUrl =
     'https://www.kuramallc.com/home/privacy/kittystory';
 
-/// Kitty Story's own Terms of Use. Apple requires this link to work from the
+/// Kitty Stories' own Terms of Use. Apple requires this link to work from the
 /// paywall itself; a dead link fails review.
 const String kTermsOfUseUrl = 'https://www.kuramallc.com/home/term/kittystory';
 

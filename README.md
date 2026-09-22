@@ -1,6 +1,6 @@
 # kitty_story
 
-Kitty Story - A Flutter app
+Kitty Stories - A Flutter app
 
 ## Getting Started
 

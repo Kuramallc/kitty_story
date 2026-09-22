@@ -10,7 +10,7 @@ import '../application/recording_controller.dart';
 /// (doubles as recorded consent inside the sample itself), then warm,
 /// varied text — different sentence lengths and tones improve clone quality.
 const String kRecordingScript = '''
-I give my permission for Kitty Story to make a copy of my voice, so it can read bedtime stories to my family.
+I give my permission for Kitty Stories to make a copy of my voice, so it can read bedtime stories to my family.
 
 Once upon a time, in a cozy little house at the edge of a quiet town, there lived a small grey kitten named Luna. Luna loved three things: warm blankets, gentle rain on the window, and stories before bed.
 
