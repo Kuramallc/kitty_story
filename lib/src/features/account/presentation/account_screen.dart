@@ -95,7 +95,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                 ? ListTile(
                     leading: Icon(Icons.workspace_premium,
                         color: theme.colorScheme.primary),
-                    title: const Text('Kitty Story Unlimited'),
+                    title: const Text('Kitty Stories Unlimited'),
                     subtitle: const Text('Active — thank you! 💜'),
                   )
                 : ListTile(

@@ -103,7 +103,7 @@ class _PaywallSheetState extends ConsumerState<_PaywallSheet> {
         children: [
           Icon(Icons.auto_awesome, size: 48, color: theme.colorScheme.primary),
           const SizedBox(height: 12),
-          Text('Kitty Story Unlimited',
+          Text('Kitty Stories Unlimited',
               style: theme.textTheme.headlineSmall, textAlign: TextAlign.center),
           const SizedBox(height: 8),
           Text(
@@ -201,7 +201,7 @@ class _SubscriptionTerms extends StatelessWidget {
     return Column(
       children: [
         Text(
-          'Kitty Story Unlimited is a $price/month subscription that renews '
+          'Kitty Stories Unlimited is a $price/month subscription that renews '
           'automatically until cancelled. Cancel any time, at least 24 hours '
           'before the period ends, in your store account settings.',
           textAlign: TextAlign.center,

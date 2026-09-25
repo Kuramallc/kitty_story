@@ -251,7 +251,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Record Mom, Dad, or Grandma reading a short script, and '
-              'Kitty Story will tell bedtime stories in their voice.',
+              'Kitty Stories will tell bedtime stories in their voice.',
               style: theme.textTheme.bodyMedium
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,

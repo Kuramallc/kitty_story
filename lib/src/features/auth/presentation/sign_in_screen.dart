@@ -68,7 +68,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     Icon(Icons.nightlight_round,
                         size: 72, color: theme.colorScheme.primary),
                     const SizedBox(height: 12),
-                    Text('Kitty Story',
+                    Text('Kitty Stories',
                         style: theme.textTheme.headlineMedium,
                         textAlign: TextAlign.center),
                     const SizedBox(height: 4),

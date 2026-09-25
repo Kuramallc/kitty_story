@@ -161,7 +161,7 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
           children: [
             Text(story.title, style: theme.textTheme.headlineSmall),
             const SizedBox(height: 4),
-            Text('Shared by a Kitty Story family',
+            Text('Shared by a Kitty Stories family',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             if (story.tags.all.isNotEmpty) ...[

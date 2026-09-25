@@ -7,7 +7,7 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: KittyStoryApp()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Kitty Story'), findsWidgets);
+    expect(find.text('Kitty Stories'), findsWidgets);
     expect(find.text('Family voices'), findsOneWidget);
   });
 }

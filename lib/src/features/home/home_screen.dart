@@ -19,7 +19,7 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kitty Story'),
+        title: const Text('Kitty Stories'),
         actions: [
           if (firebaseReady)
             IconButton(
@@ -40,7 +40,7 @@ class HomeScreen extends ConsumerWidget {
                   size: 96, color: theme.colorScheme.primary),
               const SizedBox(height: 16),
               Text(
-                'Kitty Story',
+                'Kitty Stories',
                 style: theme.textTheme.headlineMedium,
                 textAlign: TextAlign.center,
               ),

@@ -1,4 +1,4 @@
-# Kitty Story — Setup
+# Kitty Stories — Setup
 
 This covers the **credential / account steps that must be done by a human** (they need
 your Google, Apple, ElevenLabs, and Anthropic accounts). Everything else — the Flutter app,
