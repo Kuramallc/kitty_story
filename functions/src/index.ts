@@ -5,7 +5,7 @@ initializeApp();
 export { deleteAccount } from "./account";
 export { createVoiceProfile, deleteVoiceProfile } from "./voice";
 export { synthesizeNarration } from "./narration";
-export { generateStory } from "./story";
+export { generateStory, deleteGeneratedStory } from "./story";
 export {
   prepareStoryForPublish,
   publishStory,
