@@ -1,11 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import * as logger from "firebase-functions/logger";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import LanguageDetect from "languagedetect";
 
-import { requireVerifiedEmail } from "./auth";
+import { requireAuth, requireVerifiedEmail } from "./auth";
 import { ANTHROPIC_API_KEY, ENFORCE_APP_CHECK, REGION, STORY_MODEL } from "./config";
+import { detectPreferredLanguage } from "./language";
 import { enforceQuota } from "./limits";
 
 interface GenerateStoryData {
@@ -76,59 +77,6 @@ function clamp(value: unknown): string {
   return typeof value === "string" ? value.trim().slice(0, MAX_FIELD) : "";
 }
 
-const languageDetector = new LanguageDetect();
-
-/**
- * Below this many characters of combined free text, language detection is
- * unreliable (a single name can score higher for Tagalog than English) — skip
- * it and fall through to the model's default.
- */
-const MIN_DETECTION_CHARS = 8;
-/** languagedetect's own confidence score for its top guess; below this, don't trust it. */
-const MIN_DETECTION_CONFIDENCE = 0.1;
-
-/**
- * Non-Latin scripts are unambiguous by Unicode block, which is far more
- * reliable on short prompt text than `languagedetect`'s n-gram model — that
- * package only knows Latin/Cyrillic-alphabet languages and returns nothing
- * useful for e.g. Chinese or Arabic. Checked in order, first match wins:
- * Japanese before Chinese since Japanese text almost always mixes in kana
- * even when it's mostly kanji, and Ukrainian-only Cyrillic letters before
- * plain Cyrillic (which defaults to Russian, the most common case).
- */
-const SCRIPT_LANGUAGES: [RegExp, string][] = [
-  [/\p{Script=Hiragana}|\p{Script=Katakana}/u, "Japanese"],
-  [/\p{Script=Han}/u, "Chinese"],
-  [/\p{Script=Hangul}/u, "Korean"],
-  [/\p{Script=Arabic}/u, "Arabic"],
-  [/\p{Script=Hebrew}/u, "Hebrew"],
-  [/\p{Script=Devanagari}/u, "Hindi"],
-  [/\p{Script=Bengali}/u, "Bengali"],
-  [/\p{Script=Thai}/u, "Thai"],
-  [/\p{Script=Greek}/u, "Greek"],
-  [/[іїєґ]/i, "Ukrainian"],
-  [/\p{Script=Cyrillic}/u, "Russian"],
-  [/[đơư]|[ạảãầấẩẫậằắẳẵặẹẻẽềếệểễịỉĩọỏõồốộổỗờớợởỡụủũừứựửữỳỷỹ]/i, "Vietnamese"],
-];
-
-/**
- * Detects the dominant language of the user's free-text request (theme +
- * characters — childName is a proper noun and carries no language signal, so
- * it's excluded to avoid skewing the result) and returns its English name
- * (e.g. "Spanish"), or null if there isn't enough text to tell.
- */
-function detectPreferredLanguage(theme: string, characters: string): string | null {
-  const text = [theme, characters].filter(Boolean).join(". ");
-  if (text.length < MIN_DETECTION_CHARS) return null;
-  for (const [pattern, name] of SCRIPT_LANGUAGES) {
-    if (pattern.test(text)) return name;
-  }
-  const [top] = languageDetector.detect(text, 1);
-  if (!top || top[1] < MIN_DETECTION_CONFIDENCE) return null;
-  const [name] = top;
-  return name.charAt(0).toUpperCase() + name.slice(1);
-}
-
 function buildUserPrompt(data: GenerateStoryData): {
   prompt: string;
   cleaned: GenerateStoryData;
@@ -150,11 +98,15 @@ function buildUserPrompt(data: GenerateStoryData): {
   if (!theme && !characters) {
     lines.push("If no theme is given, write about a sleepy little kitten getting cozy for bed.");
   }
-  // The user's preferred language, inferred from what they typed above — write
-  // the whole story in it rather than defaulting to English.
-  if (language) {
-    lines.push(`Write the entire story — both the title and the text — in ${language}, since that's the language the request above was written in.`);
-  }
+  // Language. When the script told us outright, say so. Otherwise ask the model
+  // to match whatever the request was written in — it can read the text above
+  // and judges this far better than we can from a few words.
+  lines.push(
+    language
+      ? `Write the entire story — both the title and the text — in ${language}, since that's the language the request above was written in.`
+      : "Write the entire story — both the title and the text — in the same " +
+        "language this request is written in. If that isn't clear, write it in English.",
+  );
 
   return {
     prompt: lines.join("\n"),
@@ -226,7 +178,8 @@ export const generateStory = onCall<GenerateStoryData>(
       title,
       text,
       prompt: cleaned,
-      language: language ?? "English",
+      // Set only when the script made it certain; null means the model chose.
+      language,
       source: "generated",
       model: STORY_MODEL,
       status: "ready",
@@ -235,5 +188,71 @@ export const generateStory = onCall<GenerateStoryData>(
 
     logger.info("Story generated", { uid, storyId: doc.id, characters: text.length });
     return { storyId: doc.id, title, text };
+  },
+);
+
+interface DeleteStoryData {
+  storyId: string;
+}
+
+/**
+ * Deletes one of the user's generated stories, along with any narration audio
+ * made from it.
+ *
+ * This has to be a callable rather than a plain client delete: firestore.rules
+ * makes users/{uid}/narrations function-writable only, so a client deleting the
+ * story doc on its own would strand the narration records and their mp3s in
+ * Storage, where nothing would ever clean them up.
+ *
+ * A story that was published to the community is left published. That copy is
+ * its own thing — other families may have saved it — so taking it down is a
+ * separate, deliberate act, not a side effect of tidying your own library.
+ */
+export const deleteGeneratedStory = onCall<DeleteStoryData>(
+  {
+    region: REGION,
+    timeoutSeconds: 120,
+    enforceAppCheck: ENFORCE_APP_CHECK,
+  },
+  async (request) => {
+    const uid = requireAuth(request);
+    const storyId = request.data?.storyId;
+    if (typeof storyId !== "string" || storyId.length === 0) {
+      throw new HttpsError("invalid-argument", "storyId is required.");
+    }
+
+    const db = getFirestore();
+    const bucket = getStorage().bucket();
+    const storyRef = db
+      .collection("users").doc(uid)
+      .collection("generatedStories").doc(storyId);
+
+    if (!(await storyRef.get()).exists) {
+      throw new HttpsError("not-found", "Story not found.");
+    }
+
+    // Narration audio + metadata for every voice this story was told in.
+    // Filtered on storyId alone (single-field indexes are automatic) and the
+    // source narrowed in code — two equality filters would need a composite
+    // index for no real benefit.
+    const narrations = await db
+      .collection("users").doc(uid)
+      .collection("narrations")
+      .where("storyId", "==", storyId)
+      .get();
+    const mine = narrations.docs.filter(
+      (d) => d.get("storySource") === "generated",
+    );
+    for (const doc of mine) {
+      const audioPath = doc.get("audioPath") as string | undefined;
+      if (audioPath) await bucket.file(audioPath).delete().catch(() => undefined);
+      await doc.ref.delete();
+    }
+
+    await storyRef.delete();
+    logger.info("Generated story deleted", {
+      uid, storyId, narrations: mine.length,
+    });
+    return { deleted: true, narrations: mine.length };
   },
 );

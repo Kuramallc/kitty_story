@@ -13,6 +13,7 @@ import '../features/stories/data/story_repository.dart';
 import '../features/stories/domain/story.dart';
 import '../features/stories/presentation/generate_story_screen.dart';
 import '../features/stories/presentation/stories_screen.dart';
+import '../features/stories/presentation/story_actions.dart';
 import '../features/stories/presentation/story_cards.dart';
 import '../features/stories/presentation/story_detail_screen.dart';
 import '../features/stories/presentation/story_section_list_screen.dart';
@@ -101,7 +102,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => SectionListScreen<Story>(
           title: 'Created by me',
           watch: (ref) => ref.watch(myStoriesProvider),
-          cardBuilder: (s) => StoryCard(story: s),
+          // Consumer supplies the ref the action needs; SectionListScreen's
+          // cardBuilder only hands over the item.
+          cardBuilder: (s) => Consumer(
+            builder: (context, ref, _) => StoryCard(
+              story: s,
+              onDelete: () => confirmDeleteStory(context, ref, s),
+            ),
+          ),
           emptyMessage: 'Stories you\'ve made will appear here.',
         ),
       ),
@@ -111,7 +119,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => SectionListScreen<ArchivedStory>(
           title: 'Community',
           watch: (ref) => ref.watch(archivedStoriesProvider),
-          cardBuilder: (i) => ArchivedStoryCard(item: i),
+          cardBuilder: (i) => Consumer(
+            builder: (context, ref, _) => ArchivedStoryCard(
+              item: i,
+              onRemove: () => removeSavedStory(context, ref, i),
+            ),
+          ),
           emptyMessage: 'Tap Play on a story in Explore to save it here.',
         ),
       ),

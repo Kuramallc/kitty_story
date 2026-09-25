@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../application/explore_controller.dart';
 import '../domain/published_story.dart';
+import '../../../common/widgets/page_width.dart';
 
 /// Community feed: filter by tags, sorted by likes, infinite scroll.
 class ExploreScreen extends ConsumerStatefulWidget {
@@ -57,38 +58,43 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Explore')),
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: TextField(
-                controller: _tagInput,
-                textInputAction: TextInputAction.search,
-                onSubmitted: _addTag,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search),
-                  hintText: 'Filter by a tag (e.g. animals, kindness)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-            if (state.filterTags.isNotEmpty)
+        child: PageWidth(
+          child: Column(
+            children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Wrap(
-                    spacing: 6,
-                    children: [
-                      for (final tag in state.filterTags)
-                        InputChip(label: Text(tag), onDeleted: () => _removeTag(tag)),
-                    ],
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: TextField(
+                  controller: _tagInput,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: _addTag,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Filter by a tag (e.g. animals, kindness)',
+                    border: OutlineInputBorder(),
+                    isDense: true,
                   ),
                 ),
               ),
-            Expanded(child: _body(state)),
-          ],
+              if (state.filterTags.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Wrap(
+                      spacing: 6,
+                      children: [
+                        for (final tag in state.filterTags)
+                          InputChip(
+                            label: Text(tag),
+                            onDeleted: () => _removeTag(tag),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              Expanded(child: _body(state)),
+            ],
+          ),
         ),
       ),
     );
@@ -124,7 +130,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           if (index == state.items.length) {
             return _Footer(
               state: state,
-              onLoadMore: () => ref.read(exploreControllerProvider.notifier).loadMore(),
+              onLoadMore: () =>
+                  ref.read(exploreControllerProvider.notifier).loadMore(),
             );
           }
           return _StoryCard(story: state.items[index]);
@@ -166,20 +173,36 @@ class _StoryCard extends StatelessWidget {
                 Wrap(
                   spacing: 6,
                   runSpacing: -6,
-                  children: [for (final t in tags) Chip(label: Text(t), visualDensity: VisualDensity.compact)],
+                  children: [
+                    for (final t in tags)
+                      Chip(
+                        label: Text(t),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                  ],
                 ),
               ],
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.favorite, size: 16, color: theme.colorScheme.primary),
+                  Icon(
+                    Icons.favorite,
+                    size: 16,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 4),
                   Text('${story.likeCount}', style: theme.textTheme.bodySmall),
                   const SizedBox(width: 16),
-                  Icon(Icons.mode_comment_outlined,
-                      size: 16, color: theme.colorScheme.onSurfaceVariant),
+                  Icon(
+                    Icons.mode_comment_outlined,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                   const SizedBox(width: 4),
-                  Text('${story.commentCount}', style: theme.textTheme.bodySmall),
+                  Text(
+                    '${story.commentCount}',
+                    style: theme.textTheme.bodySmall,
+                  ),
                 ],
               ),
             ],
@@ -206,7 +229,10 @@ class _Footer extends StatelessWidget {
     }
     if (state.hasMore) {
       return Center(
-        child: TextButton(onPressed: onLoadMore, child: const Text('Load more')),
+        child: TextButton(
+          onPressed: onLoadMore,
+          child: const Text('Load more'),
+        ),
       );
     }
     return Padding(
@@ -239,10 +265,17 @@ class _Message extends StatelessWidget {
           children: [
             Icon(icon, size: 64, color: theme.colorScheme.primary),
             const SizedBox(height: 16),
-            Text(text, textAlign: TextAlign.center, style: theme.textTheme.bodyLarge),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge,
+            ),
             if (onRetry != null) ...[
               const SizedBox(height: 12),
-              FilledButton.tonal(onPressed: onRetry, child: const Text('Retry')),
+              FilledButton.tonal(
+                onPressed: onRetry,
+                child: const Text('Retry'),
+              ),
             ],
           ],
         ),

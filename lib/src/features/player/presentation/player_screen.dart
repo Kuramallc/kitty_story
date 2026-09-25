@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/audio_providers.dart';
 import '../audio/audio_handler.dart';
+import '../../../common/widgets/page_width.dart';
 
 /// Navigation payload for the player.
 class PlayerArgs {
@@ -49,26 +50,36 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Now playing')),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              const Spacer(),
-              Icon(Icons.nightlight_round, size: 120, color: theme.colorScheme.primary),
-              const SizedBox(height: 24),
-              Text(
-                widget.args.title,
-                style: theme.textTheme.headlineSmall,
-                textAlign: TextAlign.center,
-              ),
-              const Spacer(),
-              _ScrubBar(handler: handler),
-              const SizedBox(height: 8),
-              _Controls(handler: handler),
-              const SizedBox(height: 16),
-              _SleepTimer(handler: handler, onPick: () => _pickSleep(handler)),
-              const Spacer(),
-            ],
+        child: PageWidth(
+          maxWidth: kFormWidth,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                const Spacer(),
+                Icon(
+                  Icons.nightlight_round,
+                  size: 120,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  widget.args.title,
+                  style: theme.textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const Spacer(),
+                _ScrubBar(handler: handler),
+                const SizedBox(height: 8),
+                _Controls(handler: handler),
+                const SizedBox(height: 16),
+                _SleepTimer(
+                  handler: handler,
+                  onPick: () => _pickSleep(handler),
+                ),
+                const Spacer(),
+              ],
+            ),
           ),
         ),
       ),
@@ -82,7 +93,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(padding: EdgeInsets.all(16), child: Text('Pause after…')),
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Pause after…'),
+            ),
             for (final m in _sleepOptions)
               ListTile(
                 leading: const Icon(Icons.bedtime_outlined),
@@ -114,13 +128,17 @@ class _ScrubBar extends StatelessWidget {
             final maxMs = duration.inMilliseconds.toDouble();
             final sliderMax = maxMs <= 0 ? 1.0 : maxMs;
             final position = posSnap.data ?? Duration.zero;
-            final posMs = position.inMilliseconds.toDouble().clamp(0.0, sliderMax);
+            final posMs = position.inMilliseconds.toDouble().clamp(
+              0.0,
+              sliderMax,
+            );
             return Column(
               children: [
                 Slider(
                   value: posMs,
                   max: sliderMax,
-                  onChanged: (v) => handler.seek(Duration(milliseconds: v.round())),
+                  onChanged: (v) =>
+                      handler.seek(Duration(milliseconds: v.round())),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),

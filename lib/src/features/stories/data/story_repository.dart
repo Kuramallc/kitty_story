@@ -37,6 +37,17 @@ class StoryRepository {
 
   /// Generates a kid-safe story via Claude and returns it (also persisted
   /// server-side under generatedStories).
+  /// Permanently deletes one of the user's generated stories, plus any
+  /// narration audio made from it.
+  ///
+  /// Goes through a Cloud Function rather than deleting the doc directly: the
+  /// security rules make narrations function-writable only, so a client-side
+  /// delete would leave their records and mp3s orphaned in Storage.
+  Future<void> deleteGeneratedStory(String storyId) async {
+    await _callable('deleteGeneratedStory', const Duration(minutes: 2))
+        .call<Map<String, dynamic>>({'storyId': storyId});
+  }
+
   Future<Story> generateStory({
     String? childName,
     String? theme,
