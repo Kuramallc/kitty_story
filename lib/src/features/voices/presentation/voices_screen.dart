@@ -9,6 +9,7 @@ import '../../subscription/data/subscription_repository.dart';
 import '../../subscription/presentation/paywall_screen.dart';
 import '../data/voice_repository.dart';
 import '../domain/voice_profile.dart';
+import '../../../common/widgets/page_width.dart';
 
 /// Lists the family's cloned voices with live status, lets the user hear a
 /// test line in any ready voice, add new voices, and delete them.
@@ -40,8 +41,9 @@ class _VoicesScreenState extends ConsumerState<VoicesScreen> {
     }
     setState(() => _busyVoiceId = voice.id);
     try {
-      final url =
-          await ref.read(voiceRepositoryProvider).synthesizeTestLine(voice.id);
+      final url = await ref
+          .read(voiceRepositoryProvider)
+          .synthesizeTestLine(voice.id);
       await _player.setUrl(url);
       await _player.play();
     } catch (error) {
@@ -84,9 +86,9 @@ class _VoicesScreenState extends ConsumerState<VoicesScreen> {
       await ref.read(voiceRepositoryProvider).deleteVoice(voice.id);
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Delete failed: $error')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Delete failed: $error')));
       }
     }
   }
@@ -97,9 +99,12 @@ class _VoicesScreenState extends ConsumerState<VoicesScreen> {
     final entitled = ref.read(entitlementActiveProvider).value ?? false;
     final count = ref.read(voicesStreamProvider).value?.length ?? 0;
     if (!entitled && count >= kFreeMaxVoices) {
-      await showPaywall(context,
-          reason: 'The free plan includes $kFreeMaxVoices '
-              '${kFreeMaxVoices == 1 ? 'voice' : 'voices'}.');
+      await showPaywall(
+        context,
+        reason:
+            'The free plan includes $kFreeMaxVoices '
+            '${kFreeMaxVoices == 1 ? 'voice' : 'voices'}.',
+      );
       return;
     }
     // Parental gate before recording a voice.
@@ -119,21 +124,23 @@ class _VoicesScreenState extends ConsumerState<VoicesScreen> {
         label: const Text('Add a voice'),
       ),
       body: SafeArea(
-        child: AsyncValueWidget(
-          value: voices,
-          data: (list) => list.isEmpty
-              ? const _EmptyState()
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                  itemCount: list.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) => _VoiceCard(
-                    voice: list[index],
-                    busy: _busyVoiceId == list[index].id,
-                    onPlay: () => _playTestLine(list[index]),
-                    onDelete: () => _confirmDelete(list[index]),
+        child: PageWidth(
+          child: AsyncValueWidget(
+            value: voices,
+            data: (list) => list.isEmpty
+                ? const _EmptyState()
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                    itemCount: list.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) => _VoiceCard(
+                      voice: list[index],
+                      busy: _busyVoiceId == list[index].id,
+                      onPlay: () => _playTestLine(list[index]),
+                      onDelete: () => _confirmDelete(list[index]),
+                    ),
                   ),
-                ),
+          ),
         ),
       ),
     );
@@ -209,10 +216,8 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final (label, color) = switch (voice.status) {
-      VoiceStatus.pending || VoiceStatus.processing => (
-          'Creating…',
-          scheme.tertiary
-        ),
+      VoiceStatus.pending ||
+      VoiceStatus.processing => ('Creating…', scheme.tertiary),
       VoiceStatus.ready => ('Ready', scheme.primary),
       VoiceStatus.failed => ('Failed — try re-recording', scheme.error),
     };
@@ -244,16 +249,20 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.record_voice_over_outlined,
-                size: 72, color: theme.colorScheme.primary),
+            Icon(
+              Icons.record_voice_over_outlined,
+              size: 72,
+              color: theme.colorScheme.primary,
+            ),
             const SizedBox(height: 16),
             Text('No voices yet', style: theme.textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(
               'Record Mom, Dad, or Grandma reading a short script, and '
               'Kitty Stories will tell bedtime stories in their voice.',
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
