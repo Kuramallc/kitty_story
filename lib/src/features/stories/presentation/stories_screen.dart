@@ -7,7 +7,9 @@ import '../../community/data/community_repository.dart';
 import '../../community/domain/published_story.dart';
 import '../data/story_repository.dart';
 import '../domain/story.dart';
+import 'story_actions.dart';
 import 'story_cards.dart';
+import '../../../common/widgets/page_width.dart';
 
 /// Sections show at most this many stories inline; the rest are behind
 /// that section's "View all" button.
@@ -32,7 +34,7 @@ class StoriesScreen extends StatelessWidget {
         icon: const Icon(Icons.auto_awesome),
         label: const Text('Create a story'),
       ),
-      body: const SafeArea(child: _LibraryView()),
+      body: const SafeArea(child: PageWidth(child: _LibraryView())),
     );
   }
 }
@@ -57,7 +59,10 @@ class _LibraryView extends ConsumerWidget {
             subtitle: 'Stories you\'ve made',
             child: _SectionPreview<Story>(
               items: createdStories,
-              cardBuilder: (s) => StoryCard(story: s),
+              cardBuilder: (s) => StoryCard(
+                story: s,
+                onDelete: () => confirmDeleteStory(context, ref, s),
+              ),
               viewAllRoute: '/stories/created',
             ),
           );
@@ -71,10 +76,14 @@ class _LibraryView extends ConsumerWidget {
             const _SectionMessage('Could not load your saved stories.'),
         data: (list) => list.isEmpty
             ? const _SectionMessage(
-                'Tap Play on a story in Explore to save it here.')
+                'Tap Play on a story in Explore to save it here.',
+              )
             : _SectionPreview<ArchivedStory>(
                 items: list,
-                cardBuilder: (i) => ArchivedStoryCard(item: i),
+                cardBuilder: (i) => ArchivedStoryCard(
+                  item: i,
+                  onRemove: () => removeSavedStory(context, ref, i),
+                ),
                 viewAllRoute: '/stories/community',
               ),
       ),
@@ -86,7 +95,8 @@ class _LibraryView extends ConsumerWidget {
       subtitle: 'Bedtime classics to get you started',
       child: sample.when(
         loading: () => const _SectionLoader(),
-        error: (_, _) => const _SectionMessage('Could not load sample stories.'),
+        error: (_, _) =>
+            const _SectionMessage('Could not load sample stories.'),
         data: (list) => list.isEmpty
             ? const _SectionMessage('Curated stories will appear here.')
             : _SectionPreview<Story>(
@@ -97,11 +107,7 @@ class _LibraryView extends ConsumerWidget {
       ),
     );
 
-    final sections = <Widget>[
-      ?createdSection,
-      communitySection,
-      sampleSection,
-    ];
+    final sections = <Widget>[?createdSection, communitySection, sampleSection];
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
@@ -158,9 +164,9 @@ class _SectionLoader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Center(child: CircularProgressIndicator()),
-      );
+    padding: EdgeInsets.symmetric(vertical: 24),
+    child: Center(child: CircularProgressIndicator()),
+  );
 }
 
 class _SectionMessage extends StatelessWidget {
@@ -175,8 +181,9 @@ class _SectionMessage extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
       child: Text(
         text,
-        style: theme.textTheme.bodyMedium
-            ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }
