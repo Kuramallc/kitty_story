@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+5
+version: 1.0.0+6
 
 environment:
   sdk: ^3.11.1
@@ -67,6 +67,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -109,3 +110,23 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon/icon.png"
+
+# Regenerate with: dart run flutter_native_splash:create
+#
+# The crescent is Icons.nightlight_round in colorScheme.primary — the same mark
+# the home screen opens with, so the launch screen dissolves into the app
+# rather than cutting to something different. Colours are the real
+# ColorScheme.fromSeed(0xFF7C4DFF) surfaces, not eyeballed.
+#
+# The app icon is a full-bleed illustration and deliberately NOT reused here:
+# Android 12 masks the splash icon to a circle and would crop the book.
+flutter_native_splash:
+  color: "#FDF7FF"
+  color_dark: "#141318"
+  image: assets/icon/splash.png
+  image_dark: assets/icon/splash_dark.png
+  android_12:
+    color: "#FDF7FF"
+    color_dark: "#141318"
+    image: assets/icon/splash.png
+    image_dark: assets/icon/splash_dark.png
