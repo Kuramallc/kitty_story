@@ -14,6 +14,18 @@ class PlayerArgs {
 
 const _sleepOptions = <int>[5, 10, 15, 30];
 
+/// How many player screens are currently mounted — 0 or 1 in practice.
+///
+/// The mini-player hides while this is above zero, rather than inspecting the
+/// router: the screen itself knows whether it is up, regardless of how
+/// navigation got there.
+///
+/// A count, not a bool, because Flutter builds a replacement State before
+/// disposing the one it replaces. With a bool, that order runs `initState`
+/// (true) then `dispose` (false), leaving the flag off while the screen is
+/// plainly still up.
+final ValueNotifier<int> playerScreensOpen = ValueNotifier<int>(0);
+
 /// The bedtime player: large controls, a scrubber, and a sleep timer.
 /// Background + lock-screen playback come from the audio_service handler.
 class PlayerScreen extends ConsumerStatefulWidget {
@@ -29,11 +41,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    playerScreensOpen.value++;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final handler = ref.read(audioHandlerProvider);
       await handler.loadStory(url: widget.args.url, title: widget.args.title);
       await handler.play();
     });
+  }
+
+  @override
+  void dispose() {
+    playerScreensOpen.value--;
+    super.dispose();
   }
 
   static String _fmt(Duration d) {
