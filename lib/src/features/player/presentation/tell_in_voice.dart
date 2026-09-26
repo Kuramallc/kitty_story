@@ -9,6 +9,7 @@ import '../../subscription/presentation/paywall_screen.dart';
 import '../../voices/data/voice_repository.dart';
 import '../../voices/domain/voice_profile.dart';
 import 'player_screen.dart';
+import '../../../common/errors.dart';
 
 /// Shared flow: pick a ready cloned voice (prompting to record one if there are
 /// none), synthesize [story] in it, and open the bedtime player. Used by both
@@ -25,7 +26,7 @@ Future<void> tellStoryInVoice(
   } catch (error) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not load your voices: $error')),
+        SnackBar(content: Text('Could not load your voices: ${friendlyError(error)}')),
       );
     }
     return;
@@ -76,7 +77,7 @@ Future<void> tellStoryInVoice(
     if (await showPaywallIfQuota(context, error)) return;
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not play the story: $error')),
+        SnackBar(content: Text('Could not play the story: ${friendlyError(error)}')),
       );
     }
   }

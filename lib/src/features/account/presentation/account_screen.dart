@@ -7,6 +7,7 @@ import '../../auth/data/auth_repository.dart';
 import '../../subscription/data/subscription_repository.dart';
 import '../../subscription/presentation/paywall_screen.dart';
 import '../../../common/widgets/page_width.dart';
+import '../../../common/errors.dart';
 
 class AccountScreen extends ConsumerStatefulWidget {
   const AccountScreen({super.key});
@@ -69,7 +70,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       if (mounted) {
         setState(() => _deleting = false);
         messenger.showSnackBar(
-          SnackBar(content: Text('Could not delete the account: $error')),
+          SnackBar(content: Text('Could not delete the account: ${friendlyError(error)}')),
         );
       }
     }

@@ -5,6 +5,7 @@ import '../../auth/presentation/verify_email_sheet.dart';
 import '../../player/presentation/tell_in_voice.dart';
 import '../data/community_repository.dart';
 import '../domain/published_story.dart';
+import '../../../common/errors.dart';
 
 /// A community story: read it, like it, open a slide-up comment sheet, or hit
 /// Play (which saves it to your library and starts telling it in a voice).
@@ -95,7 +96,7 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
       }
     } catch (error) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not update your library: $error')),
+        SnackBar(content: Text('Could not update your library: ${friendlyError(error)}')),
       );
     }
   }
@@ -434,8 +435,5 @@ class _CommentSheetState extends ConsumerState<_CommentSheet> {
   }
 }
 
-String _friendlyComment(Object error) {
-  final s = error.toString();
-  final i = s.indexOf('] ');
-  return i >= 0 ? s.substring(i + 2) : 'Could not post that comment.';
-}
+String _friendlyComment(Object error) =>
+    friendlyError(error, fallback: 'Could not post that comment.');
