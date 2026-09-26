@@ -54,6 +54,14 @@ export const REPORT_HIDE_THRESHOLD = 3;
 /** Free-tier caps, lifted by an active subscription. */
 export const FREE_MAX_VOICES = 1;
 export const FREE_PLAYS_PER_WEEK = 2;
+/**
+ * Plays allowed during a user's first 24 hours of listening.
+ *
+ * Someone trying the app at bedtime should be able to settle in and hear a few
+ * stories rather than hit a wall on the third — two a week is a fine steady
+ * state but a discouraging first impression. Granted once and never renewed.
+ */
+export const WELCOME_DAY_PLAYS = 5;
 /** Abuse caps — apply to everyone (incl. subscribers) as a cost backstop. */
 export const ABUSE_GENERATE_PER_DAY = 20;
 export const ABUSE_NARRATE_PER_DAY = 100;

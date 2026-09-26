@@ -9,6 +9,7 @@ import '../../voices/data/voice_repository.dart';
 import '../../voices/domain/voice_profile.dart';
 import '../data/story_repository.dart';
 import '../domain/story.dart';
+import 'story_actions.dart';
 import '../../../common/widgets/page_width.dart';
 import '../../../common/errors.dart';
 
@@ -115,6 +116,13 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
     );
   }
 
+  /// Deletes this story, then closes the screen — there is nothing left to
+  /// read once it is gone.
+  Future<void> _delete() async {
+    final deleted = await confirmDeleteStory(context, ref, widget.story);
+    if (deleted && mounted && context.canPop()) context.pop();
+  }
+
   /// Publishing makes the story visible to other families' children, so it's
   /// gated behind a grown-up check.
   Future<void> _share(Story story) async {
@@ -171,19 +179,37 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                 child: PageWidth(
                   maxWidth: kFormWidth,
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _busy ? null : _tellInVoice,
-                      icon: _busy
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.play_arrow),
-                      label: Text(_busy ? 'Preparing…' : 'Tell it in a voice'),
-                    ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _busy ? null : _tellInVoice,
+                          icon: _busy
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.play_arrow),
+                          label:
+                              Text(_busy ? 'Preparing…' : 'Tell it in a voice'),
+                        ),
+                      ),
+                      // Only the user's own stories: the samples and anything
+                      // saved from the community aren't theirs to delete.
+                      if (story.source == StorySource.generated)
+                        TextButton.icon(
+                          onPressed: _busy ? null : _delete,
+                          icon: const Icon(Icons.delete_outline, size: 20),
+                          label: const Text('Delete this story'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: theme.colorScheme.error,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
