@@ -32,6 +32,8 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
   late final Stream<bool> _likedStream = _repo.watchLiked(widget.storyId);
   late final Stream<int> _commentCountStream =
       _repo.watchComments(widget.storyId).map((c) => c.length);
+  late final Stream<bool> _savedStream =
+      _repo.watchArchivedFlag(widget.storyId);
 
   @override
   void initState() {
@@ -74,6 +76,30 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
   }
 
   /// Save the story to the user's library, then start telling it in a voice.
+  /// Saves the story to the user's library, or removes it if already saved.
+  Future<void> _toggleSave(bool saved) async {
+    final story = _story;
+    if (story == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      if (saved) {
+        await _repo.unarchive(widget.storyId);
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Removed from your stories.')),
+        );
+      } else {
+        await _repo.archive(story);
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Saved to your stories.')),
+        );
+      }
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not update your library: $error')),
+      );
+    }
+  }
+
   Future<void> _play() async {
     final story = _story;
     if (story == null) return;
@@ -147,10 +173,19 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
       appBar: AppBar(
         title: Text(story.title),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.flag_outlined),
-            tooltip: 'Report',
-            onPressed: _report,
+          // Saving is the action people reach for up here; reporting moved
+          // down beside the other per-story actions, where its red colour
+          // makes it obvious it is not a way to keep the story.
+          StreamBuilder<bool>(
+            stream: _savedStream,
+            builder: (context, snap) {
+              final saved = snap.data ?? false;
+              return IconButton(
+                icon: Icon(saved ? Icons.bookmark : Icons.bookmark_border),
+                tooltip: saved ? 'Remove from my stories' : 'Save to my stories',
+                onPressed: () => _toggleSave(saved),
+              );
+            },
           ),
         ],
       ),
@@ -188,6 +223,7 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
         commentCountStream: _commentCountStream,
         onLike: _toggleLike,
         onComment: _openComments,
+        onReport: _report,
         onPlay: _play,
       ),
     );
@@ -203,6 +239,7 @@ class _ActionBar extends StatelessWidget {
     required this.commentCountStream,
     required this.onLike,
     required this.onComment,
+    required this.onReport,
     required this.onPlay,
   });
 
@@ -213,6 +250,7 @@ class _ActionBar extends StatelessWidget {
   final Stream<int> commentCountStream;
   final VoidCallback onLike;
   final VoidCallback onComment;
+  final VoidCallback onReport;
   final VoidCallback onPlay;
 
   @override
@@ -245,6 +283,14 @@ class _ActionBar extends StatelessWidget {
                   icon: const Icon(Icons.mode_comment_outlined),
                   label: Text('${snap.data ?? 0}'),
                 ),
+              ),
+              // Red, and sitting apart from the counts, so it reads as
+              // "report this" rather than another way to keep the story.
+              IconButton(
+                onPressed: onReport,
+                icon: const Icon(Icons.flag_outlined),
+                color: theme.colorScheme.error,
+                tooltip: 'Report this story',
               ),
               const Spacer(),
               FilledButton.icon(
