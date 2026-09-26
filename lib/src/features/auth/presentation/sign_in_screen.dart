@@ -1,10 +1,10 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../application/auth_controller.dart';
+import '../../../common/errors.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
@@ -159,9 +159,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   }
 }
 
-String _friendlyError(Object error) {
-  if (error is FirebaseAuthException) {
-    return error.message ?? 'Authentication failed (${error.code}).';
-  }
-  return 'Something went wrong. Please try again.';
-}
+String _friendlyError(Object error) => friendlyError(
+      error,
+      fallback: 'Something went wrong. Please try again.',
+    );

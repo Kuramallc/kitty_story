@@ -10,6 +10,7 @@ import '../../voices/domain/voice_profile.dart';
 import '../data/story_repository.dart';
 import '../domain/story.dart';
 import '../../../common/widgets/page_width.dart';
+import '../../../common/errors.dart';
 
 /// Reads a story and lets the user hear it narrated in a chosen cloned voice.
 /// Synthesizing hands off to the full bedtime player ([PlayerScreen]).
@@ -32,7 +33,7 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not load your voices: $error')),
+          SnackBar(content: Text('Could not load your voices: ${friendlyError(error)}')),
         );
       }
       return;
@@ -83,7 +84,7 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
       if (await showVerifyEmailIfNeeded(context, error)) return;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not play the story: $error')),
+          SnackBar(content: Text('Could not play the story: ${friendlyError(error)}')),
         );
       }
     } finally {

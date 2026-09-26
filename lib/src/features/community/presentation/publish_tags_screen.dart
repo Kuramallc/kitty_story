@@ -6,6 +6,7 @@ import '../../auth/presentation/verify_email_sheet.dart';
 import '../../stories/domain/story.dart';
 import '../data/community_repository.dart';
 import '../domain/published_story.dart';
+import '../../../common/errors.dart';
 
 /// Moderates a generated story, shows Claude's proposed tags for editing, and
 /// publishes it to the community pool.
@@ -161,11 +162,8 @@ class _PublishTagsScreenState extends ConsumerState<PublishTagsScreen> {
   }
 }
 
-String _friendly(Object error) {
-  final s = error.toString();
-  final i = s.indexOf('] ');
-  return i >= 0 ? s.substring(i + 2) : 'Could not publish. Please try again.';
-}
+String _friendly(Object error) =>
+    friendlyError(error, fallback: 'Could not publish. Please try again.');
 
 class _Centered extends StatelessWidget {
   const _Centered({required this.child});

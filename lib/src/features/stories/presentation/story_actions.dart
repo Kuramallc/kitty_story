@@ -5,6 +5,7 @@ import '../../community/data/community_repository.dart';
 import '../../community/domain/published_story.dart';
 import '../data/story_repository.dart';
 import '../domain/story.dart';
+import '../../../common/errors.dart';
 
 /// Confirms, then permanently deletes one of the user's own generated stories.
 ///
@@ -49,7 +50,7 @@ Future<void> confirmDeleteStory(
     );
   } catch (error) {
     messenger.showSnackBar(
-      SnackBar(content: Text('Could not delete the story: $error')),
+      SnackBar(content: Text('Could not delete the story: ${friendlyError(error)}')),
     );
   }
 }
@@ -79,7 +80,7 @@ Future<void> removeSavedStory(
     );
   } catch (error) {
     messenger.showSnackBar(
-      SnackBar(content: Text('Could not remove the story: $error')),
+      SnackBar(content: Text('Could not remove the story: ${friendlyError(error)}')),
     );
   }
 }

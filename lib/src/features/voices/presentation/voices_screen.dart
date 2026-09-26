@@ -10,6 +10,7 @@ import '../../subscription/presentation/paywall_screen.dart';
 import '../data/voice_repository.dart';
 import '../domain/voice_profile.dart';
 import '../../../common/widgets/page_width.dart';
+import '../../../common/errors.dart';
 
 /// Lists the family's cloned voices with live status, lets the user hear a
 /// test line in any ready voice, add new voices, and delete them.
@@ -49,7 +50,7 @@ class _VoicesScreenState extends ConsumerState<VoicesScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not play the test line: $error')),
+          SnackBar(content: Text('Could not play the test line: ${friendlyError(error)}')),
         );
       }
     } finally {
@@ -88,7 +89,7 @@ class _VoicesScreenState extends ConsumerState<VoicesScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Delete failed: $error')));
+        ).showSnackBar(SnackBar(content: Text('Delete failed: ${friendlyError(error)}')));
       }
     }
   }

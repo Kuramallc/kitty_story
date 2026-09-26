@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../auth/presentation/verify_email_sheet.dart';
 import '../data/story_repository.dart';
 import '../../../common/widgets/page_width.dart';
+import '../../../common/errors.dart';
 
 const _ageRanges = ['2-3 years', '4-5 years', '6-8 years'];
 
@@ -51,7 +52,7 @@ class _GenerateStoryScreenState extends ConsumerState<GenerateStoryScreen> {
       if (await showVerifyEmailIfNeeded(context, error)) return;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not create the story: $error')),
+          SnackBar(content: Text('Could not create the story: ${friendlyError(error)}')),
         );
       }
     }
