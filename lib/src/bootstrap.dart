@@ -81,6 +81,7 @@ Future<void> bootstrap() async {
         firebaseReadyProvider.overrideWithValue(firebaseReady),
         if (audioHandler != null)
           audioHandlerProvider.overrideWithValue(audioHandler),
+        audioHandlerOrNullProvider.overrideWithValue(audioHandler),
       ],
       child: const KittyStoryApp(),
     ),
