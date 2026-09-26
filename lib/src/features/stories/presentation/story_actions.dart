@@ -11,7 +11,11 @@ import '../../../common/errors.dart';
 ///
 /// Gated behind a confirmation because it cannot be undone: the story and every
 /// narration recorded from it are gone for good.
-Future<void> confirmDeleteStory(
+///
+/// Returns true only when the story is actually gone, so a caller showing that
+/// story can close itself — and stays put if the user backed out or the delete
+/// failed.
+Future<bool> confirmDeleteStory(
   BuildContext context,
   WidgetRef ref,
   Story story,
@@ -40,7 +44,7 @@ Future<void> confirmDeleteStory(
       ],
     ),
   );
-  if (confirmed != true || !context.mounted) return;
+  if (confirmed != true || !context.mounted) return false;
 
   final messenger = ScaffoldMessenger.of(context);
   try {
@@ -48,10 +52,12 @@ Future<void> confirmDeleteStory(
     messenger.showSnackBar(
       SnackBar(content: Text('Deleted "${story.title}".')),
     );
+    return true;
   } catch (error) {
     messenger.showSnackBar(
       SnackBar(content: Text('Could not delete the story: ${friendlyError(error)}')),
     );
+    return false;
   }
 }
 
