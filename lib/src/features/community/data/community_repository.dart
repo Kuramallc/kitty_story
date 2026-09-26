@@ -165,6 +165,21 @@ class CommunityRepository {
     });
   }
 
+  /// Re-saves a story the user just removed, so the Undo on that action can
+  /// restore it. `authorUid` isn't carried on [ArchivedStory] and nothing reads
+  /// it back, so the restored bookmark is equivalent for every purpose the app
+  /// has.
+  Future<void> rearchive(ArchivedStory item) async {
+    final ref = _archiveDoc(item.publishedStoryId);
+    if (ref == null) return;
+    await ref.set({
+      'publishedStoryId': item.publishedStoryId,
+      'title': item.title,
+      'tags': item.tags.toMap(),
+      'archivedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Future<void> unarchive(String publishedStoryId) async {
     await _archiveDoc(publishedStoryId)?.delete();
   }

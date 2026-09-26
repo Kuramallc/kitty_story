@@ -9,6 +9,7 @@ import '../../voices/data/voice_repository.dart';
 import '../../voices/domain/voice_profile.dart';
 import '../data/story_repository.dart';
 import '../domain/story.dart';
+import '../../../common/widgets/page_width.dart';
 
 /// Reads a story and lets the user hear it narrated in a chosen cloned voice.
 /// Synthesizing hands off to the full bedtime player ([PlayerScreen]).
@@ -72,8 +73,10 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
           .read(storyRepositoryProvider)
           .synthesize(story: widget.story, voiceId: voice.id);
       if (mounted) {
-        context.push('/player',
-            extra: PlayerArgs(url: url, title: widget.story.title));
+        context.push(
+          '/player',
+          extra: PlayerArgs(url: url, title: widget.story.title),
+        );
       }
     } catch (error) {
       if (!mounted) return;
@@ -138,39 +141,48 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
         child: Column(
           children: [
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-                children: [
-                  Text(story.title, style: theme.textTheme.headlineSmall),
-                  if (story.ageRange != null) ...[
-                    const SizedBox(height: 4),
+              child: PageWidth(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                  children: [
+                    Text(story.title, style: theme.textTheme.headlineSmall),
+                    if (story.ageRange != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'For ${story.ageRange}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
                     Text(
-                      'For ${story.ageRange}',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      story.text,
+                      style: theme.textTheme.bodyLarge?.copyWith(height: 1.6),
                     ),
                   ],
-                  const SizedBox(height: 16),
-                  Text(story.text, style: theme.textTheme.bodyLarge?.copyWith(height: 1.6)),
-                ],
+                ),
               ),
             ),
             Material(
               elevation: 8,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _busy ? null : _tellInVoice,
-                    icon: _busy
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.play_arrow),
-                    label: Text(_busy ? 'Preparing…' : 'Tell it in a voice'),
+                child: PageWidth(
+                  maxWidth: kFormWidth,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _busy ? null : _tellInVoice,
+                      icon: _busy
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.play_arrow),
+                      label: Text(_busy ? 'Preparing…' : 'Tell it in a voice'),
+                    ),
                   ),
                 ),
               ),
