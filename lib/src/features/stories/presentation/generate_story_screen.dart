@@ -156,7 +156,16 @@ class _GenerateStoryScreenState extends ConsumerState<GenerateStoryScreen> {
               ),
               if (_loading) ...[
                 const SizedBox(height: 24),
-                PacedProgress(done: _arrived, messages: _writingMessages),
+                // 45s, not the widget's generic default: generation observably
+                // runs well past half a minute. Pacing the bar to the real
+                // wait keeps it moving for most of it, instead of racing to
+                // the ceiling and parking there — which is barely better than
+                // a spinner. Overrunning is still safe; the bar just eases.
+                PacedProgress(
+                  done: _arrived,
+                  duration: const Duration(seconds: 45),
+                  messages: _writingMessages,
+                ),
               ],
             ],
           ),

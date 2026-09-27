@@ -59,6 +59,30 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('a longer duration paces the crawl slower', (tester) async {
+    // The screen passes 45s because generation really takes that long. If the
+    // duration stopped being honoured the bar would race to the ceiling and
+    // park, which is what it exists to avoid.
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: PacedProgress(done: false, duration: Duration(seconds: 45)),
+        ),
+      ),
+    );
+    await _pumpFor(tester, const Duration(seconds: 10));
+    final slow = _value(tester);
+    await tester.pumpWidget(const SizedBox());
+
+    await tester.pumpWidget(_host(done: false)); // default 10s
+    await _pumpFor(tester, const Duration(seconds: 10));
+    final fast = _value(tester);
+    await tester.pumpWidget(const SizedBox());
+
+    expect(slow, lessThan(fast),
+        reason: 'at the same wall-clock, 45s pacing must be further behind');
+  });
+
   testWidgets('never shows two messages at once', (tester) async {
     // Regression: a plain cross-fade stacks the outgoing and incoming lines,
     // and two centred strings of different lengths fading through each other
