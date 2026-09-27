@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "681757798375-58s0lfrfl0e5am47k1tud9bhb710rcen.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kuramallc.kitty_story",
+            "certificate_hash": "e06fe3af223bdc5dda859df261751e05dfc39ebc"
+          }
+        },
+        {
           "client_id": "681757798375-cp5lb1lk7ieaqjesu1krhgfidu59v9og.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
