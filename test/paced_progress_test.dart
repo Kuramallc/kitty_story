@@ -83,6 +83,34 @@ void main() {
         reason: 'at the same wall-clock, 45s pacing must be further behind');
   });
 
+  testWidgets('stays hidden until revealAfter has passed', (tester) async {
+    // Narration is usually a cache hit returning in ~0.1s. Showing the bar
+    // immediately would flash it for a frame on the majority of taps.
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: PacedProgress(
+            done: false,
+            revealAfter: Duration(milliseconds: 600),
+          ),
+        ),
+      ),
+    );
+    await _pumpFor(tester, const Duration(milliseconds: 400));
+    expect(find.byType(LinearProgressIndicator), findsNothing,
+        reason: 'still inside the reveal delay');
+
+    await _pumpFor(tester, const Duration(milliseconds: 500));
+    expect(find.byType(LinearProgressIndicator), findsOneWidget,
+        reason: 'reveal delay has passed');
+
+    // The pacing clock runs while hidden, so it appears where the elapsed
+    // time says it should be rather than snapping back to zero.
+    expect(_value(tester), greaterThan(0.0));
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('never shows two messages at once', (tester) async {
     // Regression: a plain cross-fade stacks the outgoing and incoming lines,
     // and two centred strings of different lengths fading through each other

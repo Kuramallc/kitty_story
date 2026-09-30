@@ -11,15 +11,45 @@ import '../../voices/domain/voice_profile.dart';
 import 'player_screen.dart';
 import '../../../common/errors.dart';
 
+/// How long a fresh narration takes. Measured over real synthesis calls:
+/// 15-32s, p90 ~31s.
+const kNarrationPace = Duration(seconds: 30);
+
+/// A progress bar waits this long before appearing. Narration is usually a
+/// cache hit returning in well under a second, so showing one unconditionally
+/// would flash it for a frame on the common path. Nothing measured lands near
+/// this threshold: cached replays come back around 0.1s, fresh synthesis takes
+/// 15s or more.
+const kNarrationBarReveal = Duration(milliseconds: 600);
+
+/// Long enough for a completed bar to read as finished rather than cut off.
+const _barFinish = Duration(milliseconds: 280);
+
+/// Shown one after another while a narration is synthesized. Pacing copy, not
+/// backend stages — see PacedProgress.
+const kNarratingMessages = [
+  'Warming up the voice…',
+  'Reading the story through…',
+  'Adding gentle pauses…',
+  'Settling it into a bedtime pace…',
+];
+
 /// Shared flow: pick a ready cloned voice (prompting to record one if there are
 /// none), synthesize [story] in it, and open the bedtime player. Used by both
 /// the generated-story and community-story detail screens.
+///
+/// [onSynthesized] fires the moment the audio is ready, before navigating, so
+/// a caller showing a progress bar can run it out to 100%. It is deliberately
+/// *not* called when synthesis came back faster than [kNarrationBarReveal]: no
+/// bar was ever on screen, so there is nothing to finish and no reason to make
+/// a cached replay wait for an animation nobody saw.
 Future<void> tellStoryInVoice(
   BuildContext context,
   WidgetRef ref,
   Story story,
-  String title,
-) async {
+  String title, {
+  VoidCallback? onSynthesized,
+}) async {
   final List<VoiceProfile> voices;
   try {
     voices = await ref.read(voiceRepositoryProvider).fetchVoices();
@@ -62,9 +92,15 @@ Future<void> tellStoryInVoice(
   if (voice == null) return;
 
   try {
+    final elapsed = Stopwatch()..start();
     final url = await ref
         .read(storyRepositoryProvider)
         .synthesize(story: story, voiceId: voice.id);
+    if (!context.mounted) return;
+    if (onSynthesized != null && elapsed.elapsed > kNarrationBarReveal) {
+      onSynthesized();
+      await Future<void>.delayed(_barFinish);
+    }
     if (context.mounted) {
       context.push('/player', extra: PlayerArgs(url: url, title: title));
     }
