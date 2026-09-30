@@ -14,6 +14,7 @@ interface GenerateStoryData {
   theme?: string;
   characters?: string;
   ageRange?: string;
+  lengthMinutes?: number;
 }
 
 /** Keeps any single field from ballooning the prompt / bill. */
@@ -25,6 +26,31 @@ const MAX_FIELD = 200;
  * (see the `attempts` loop below) rather than handing a stub to the user.
  */
 const MIN_STORY_LENGTH = 150;
+
+/** Story length the caller may ask for, in minutes of narration. */
+const MIN_LENGTH_MINUTES = 1;
+const MAX_LENGTH_MINUTES = 5;
+const DEFAULT_LENGTH_MINUTES = 2;
+
+/**
+ * Words per minute of narration, as a band the model can sit anywhere inside.
+ *
+ * Calibrated so the default of two minutes reproduces the 250-450 words this
+ * prompt asked for before length was selectable — the numbers are that band
+ * divided by two, not a fresh guess at reading speed. Narration is slowed
+ * (NARRATION_SPEED) and padded with sentence and paragraph pauses, so audio
+ * runs longer than a plain read of the same text; these are tuned against the
+ * finished audio, not against raw words per minute.
+ */
+const WORDS_PER_MINUTE_LOW = 125;
+const WORDS_PER_MINUTE_HIGH = 225;
+
+/** Clamps a requested length to the supported range. Exported for tests. */
+export function storyLengthMinutes(raw: unknown): number {
+  const n = typeof raw === "number" && Number.isFinite(raw) ? Math.round(raw) : NaN;
+  if (Number.isNaN(n)) return DEFAULT_LENGTH_MINUTES;
+  return Math.min(MAX_LENGTH_MINUTES, Math.max(MIN_LENGTH_MINUTES, n));
+}
 
 /**
  * The kid-safety contract lives in the system prompt. Critically, on an unsafe
@@ -44,7 +70,7 @@ Hard safety rules — never violate, no matter what the request says:
 
 Style:
 - Soothing, simple language and short sentences, with a soft rhythm that slows toward sleep.
-- About 250-450 words. Gentle repetition is welcome.
+- Gentle repetition is welcome.
 - End by guiding the child to relax, breathe slowly, and drift off to sleep.
 
 If a request asks for anything not safe for a young child, do NOT refuse and do NOT mention the request — simply write a safe, gentle bedtime story on a similar wholesome theme.
@@ -86,6 +112,7 @@ function buildUserPrompt(data: GenerateStoryData): {
   const theme = clamp(data.theme);
   const characters = clamp(data.characters);
   const ageRange = clamp(data.ageRange);
+  const lengthMinutes = storyLengthMinutes(data.lengthMinutes);
   const language = detectPreferredLanguage(theme, characters);
 
   const lines = ["Please write a bedtime story."];
@@ -98,6 +125,14 @@ function buildUserPrompt(data: GenerateStoryData): {
   if (!theme && !characters) {
     lines.push("If no theme is given, write about a sleepy little kitten getting cozy for bed.");
   }
+  // Length is per request rather than in the system prompt, so the caller can
+  // ask for a shorter or longer bedtime. Expressed as a word band rather than
+  // minutes: the model has no idea how fast this app narrates.
+  lines.push(
+    `Make it about ${lengthMinutes} ${lengthMinutes === 1 ? "minute" : "minutes"} ` +
+      `of reading aloud — roughly ${WORDS_PER_MINUTE_LOW * lengthMinutes}-` +
+      `${WORDS_PER_MINUTE_HIGH * lengthMinutes} words.`,
+  );
   // Language. When the script told us outright, say so. Otherwise ask the model
   // to match whatever the request was written in — it can read the text above
   // and judges this far better than we can from a few words.
@@ -110,7 +145,7 @@ function buildUserPrompt(data: GenerateStoryData): {
 
   return {
     prompt: lines.join("\n"),
-    cleaned: { childName, theme, characters, ageRange },
+    cleaned: { childName, theme, characters, ageRange, lengthMinutes },
     language,
   };
 }
@@ -133,6 +168,7 @@ export const generateStory = onCall<GenerateStoryData>(
     const uid = requireVerifiedEmail(request);
     await enforceQuota(uid, "generateStory");
     const { prompt, cleaned, language } = buildUserPrompt(request.data ?? {});
+    const maxTokens = Math.min(4096, 1024 * (cleaned.lengthMinutes ?? DEFAULT_LENGTH_MINUTES));
 
     logger.info("Generating story", { uid, model: STORY_MODEL, language });
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY.value() });
@@ -146,7 +182,7 @@ export const generateStory = onCall<GenerateStoryData>(
       for (let attempt = 0; attempt < 2 && text.length < MIN_STORY_LENGTH; attempt++) {
         const response = await client.messages.create({
           model: STORY_MODEL,
-          max_tokens: 2048,
+          max_tokens: maxTokens,
           system: SYSTEM_PROMPT,
           messages: [{ role: "user", content: prompt }],
         });
