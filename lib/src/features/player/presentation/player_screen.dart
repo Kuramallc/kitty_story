@@ -12,7 +12,7 @@ class PlayerArgs {
   final String title;
 }
 
-const _sleepOptions = <int>[5, 10, 15, 30];
+const _sleepOptions = <int>[2, 4, 6, 8];
 
 /// How many player screens are currently mounted — 0 or 1 in practice.
 ///
