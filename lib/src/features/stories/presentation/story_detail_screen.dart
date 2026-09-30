@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,8 +12,27 @@ import '../../voices/domain/voice_profile.dart';
 import '../data/story_repository.dart';
 import '../domain/story.dart';
 import 'story_actions.dart';
+import '../../../common/widgets/paced_progress.dart';
 import '../../../common/widgets/page_width.dart';
 import '../../../common/errors.dart';
+
+/// Shown one after another while a narration is being synthesized. Pacing
+/// copy, not backend stages — see [PacedProgress].
+const _narratingMessages = [
+  'Warming up the voice…',
+  'Reading the story through…',
+  'Adding gentle pauses…',
+  'Settling it into a bedtime pace…',
+];
+
+/// How long a fresh narration takes. Measured over real synthesis calls:
+/// 15-32s, p90 ~31s. Cached replays return in well under a second and never
+/// reach the bar — see [_barReveal].
+const _narrationPace = Duration(seconds: 30);
+
+/// Narration is usually a cache hit, so hold the bar back briefly rather than
+/// flashing it for a fraction of a second on the common path.
+const _barReveal = Duration(milliseconds: 600);
 
 /// Reads a story and lets the user hear it narrated in a chosen cloned voice.
 /// Synthesizing hands off to the full bedtime player ([PlayerScreen]).
@@ -26,6 +47,15 @@ class StoryDetailScreen extends ConsumerStatefulWidget {
 
 class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
   bool _busy = false;
+  bool _arrived = false;
+  bool _showBar = false;
+  Timer? _revealTimer;
+
+  @override
+  void dispose() {
+    _revealTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _tellInVoice() async {
     final List<VoiceProfile> voices;
@@ -69,11 +99,26 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
     final voice = ready.length == 1 ? ready.first : await _pickVoice(ready);
     if (voice == null) return;
 
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _arrived = false;
+      _showBar = false;
+    });
+    _revealTimer?.cancel();
+    _revealTimer = Timer(_barReveal, () {
+      if (mounted && _busy) setState(() => _showBar = true);
+    });
     try {
       final url = await ref
           .read(storyRepositoryProvider)
           .synthesize(story: widget.story, voiceId: voice.id);
+      if (!mounted) return;
+      // Only let the bar finish if it was ever shown; on a cache hit it never
+      // appeared, and pausing there would add a delay for no reason.
+      if (_showBar) {
+        setState(() => _arrived = true);
+        await Future<void>.delayed(const Duration(milliseconds: 280));
+      }
       if (mounted) {
         context.push(
           '/player',
@@ -89,7 +134,14 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      _revealTimer?.cancel();
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _showBar = false;
+          _arrived = false;
+        });
+      }
     }
   }
 
@@ -198,6 +250,14 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
                               Text(_busy ? 'Preparing…' : 'Tell it in a voice'),
                         ),
                       ),
+                      if (_showBar) ...[
+                        const SizedBox(height: 16),
+                        PacedProgress(
+                          done: _arrived,
+                          duration: _narrationPace,
+                          messages: _narratingMessages,
+                        ),
+                      ],
                       // Only the user's own stories: the samples and anything
                       // saved from the community aren't theirs to delete.
                       if (story.source == StorySource.generated)
