@@ -7,6 +7,22 @@ import '../../auth/data/auth_repository.dart';
 import '../../voices/data/voice_repository.dart' show kFunctionsRegion;
 import '../domain/story.dart';
 
+/// Story length the user can ask for, in minutes of narration. Mirrors
+/// MIN/MAX/DEFAULT_LENGTH_MINUTES in functions/src/story.ts.
+const int kMinStoryMinutes = 1;
+const int kMaxStoryMinutes = 5;
+const int kDefaultStoryMinutes = 2;
+
+/// How long generation takes for a story of [minutes].
+///
+/// Measured at the default of two minutes: p50 28s, p90 47s over successful
+/// calls. Longer stories are more output tokens and take proportionally
+/// longer, on top of a roughly fixed round-trip and think time — hence a
+/// constant plus a per-minute term rather than a flat scale. Two minutes still
+/// lands on the 45s the bar was paced to before length was selectable.
+Duration storyGenerationPace(int minutes) =>
+    Duration(seconds: 15 + 15 * minutes);
+
 class StoryRepository {
   StoryRepository(this._auth, this._firestore, this._functions);
 
@@ -53,6 +69,7 @@ class StoryRepository {
     String? theme,
     String? characters,
     String? ageRange,
+    int lengthMinutes = kDefaultStoryMinutes,
   }) async {
     final result = await _callable('generateStory', const Duration(minutes: 2))
         .call<Map<String, dynamic>>({
@@ -60,6 +77,7 @@ class StoryRepository {
       'theme': theme,
       'characters': characters,
       'ageRange': ageRange,
+      'lengthMinutes': lengthMinutes,
     });
     final data = Map<String, dynamic>.from(result.data);
     return Story(

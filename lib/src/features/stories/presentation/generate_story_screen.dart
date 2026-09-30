@@ -37,6 +37,7 @@ class _GenerateStoryScreenState extends ConsumerState<GenerateStoryScreen> {
   final _theme = TextEditingController();
   final _characters = TextEditingController();
   String _ageRange = _ageRanges[1];
+  int _minutes = kDefaultStoryMinutes;
   bool _loading = false;
   bool _arrived = false;
 
@@ -61,6 +62,7 @@ class _GenerateStoryScreenState extends ConsumerState<GenerateStoryScreen> {
             theme: _theme.text.trim(),
             characters: _characters.text.trim(),
             ageRange: _ageRange,
+            lengthMinutes: _minutes,
           );
       if (!mounted) return;
       // Let the bar visibly finish before the screen changes. Without this the
@@ -148,7 +150,33 @@ class _GenerateStoryScreenState extends ConsumerState<GenerateStoryScreen> {
                     ? null
                     : (v) => setState(() => _ageRange = v ?? _ageRange),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+              // Length. A slider rather than a dropdown because the values are
+              // a continuous scale a parent scrubs by feel, not a list to read.
+              Row(
+                children: [
+                  Text('Length', style: theme.textTheme.bodyMedium),
+                  const Spacer(),
+                  Text(
+                    '$_minutes ${_minutes == 1 ? 'minute' : 'minutes'}',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              Slider(
+                value: _minutes.toDouble(),
+                min: kMinStoryMinutes.toDouble(),
+                max: kMaxStoryMinutes.toDouble(),
+                divisions: kMaxStoryMinutes - kMinStoryMinutes,
+                label: '$_minutes min',
+                onChanged: _loading
+                    ? null
+                    : (v) => setState(() => _minutes = v.round()),
+              ),
+              const SizedBox(height: 8),
               FilledButton.icon(
                 onPressed: _loading ? null : _generate,
                 icon: const Icon(Icons.auto_awesome),
@@ -156,14 +184,14 @@ class _GenerateStoryScreenState extends ConsumerState<GenerateStoryScreen> {
               ),
               if (_loading) ...[
                 const SizedBox(height: 24),
-                // 45s, not the widget's generic default: generation observably
-                // runs well past half a minute. Pacing the bar to the real
-                // wait keeps it moving for most of it, instead of racing to
-                // the ceiling and parking there — which is barely better than
-                // a spinner. Overrunning is still safe; the bar just eases.
+                // Paced to how long this length actually takes, not the
+                // widget's generic default: a five-minute story is roughly
+                // twice the wait of a two-minute one, and a bar tuned for the
+                // short case would park at the ceiling for the rest.
+                // Overrunning stays safe; the bar just eases.
                 PacedProgress(
                   done: _arrived,
-                  duration: const Duration(seconds: 45),
+                  duration: storyGenerationPace(_minutes),
                   messages: _writingMessages,
                 ),
               ],
