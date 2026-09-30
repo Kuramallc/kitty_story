@@ -5,11 +5,13 @@ import 'package:go_router/go_router.dart';
 import '../../../common/widgets/parental_gate.dart';
 import '../../auth/presentation/verify_email_sheet.dart';
 import '../../player/presentation/player_screen.dart';
+import '../../player/presentation/tell_in_voice.dart';
 import '../../voices/data/voice_repository.dart';
 import '../../voices/domain/voice_profile.dart';
 import '../data/story_repository.dart';
 import '../domain/story.dart';
 import 'story_actions.dart';
+import '../../../common/widgets/paced_progress.dart';
 import '../../../common/widgets/page_width.dart';
 import '../../../common/errors.dart';
 
@@ -26,6 +28,7 @@ class StoryDetailScreen extends ConsumerStatefulWidget {
 
 class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
   bool _busy = false;
+  bool _arrived = false;
 
   Future<void> _tellInVoice() async {
     final List<VoiceProfile> voices;
@@ -69,11 +72,22 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
     final voice = ready.length == 1 ? ready.first : await _pickVoice(ready);
     if (voice == null) return;
 
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _arrived = false;
+    });
+    final elapsed = Stopwatch()..start();
     try {
       final url = await ref
           .read(storyRepositoryProvider)
           .synthesize(story: widget.story, voiceId: voice.id);
+      if (!mounted) return;
+      // Only run the bar out if it was ever on screen. On a cache hit it never
+      // appeared, so pausing here would delay the player for nothing.
+      if (elapsed.elapsed > kNarrationBarReveal) {
+        setState(() => _arrived = true);
+        await Future<void>.delayed(const Duration(milliseconds: 280));
+      }
       if (mounted) {
         context.push(
           '/player',
@@ -89,7 +103,12 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _arrived = false;
+        });
+      }
     }
   }
 
@@ -198,6 +217,15 @@ class _StoryDetailScreenState extends ConsumerState<StoryDetailScreen> {
                               Text(_busy ? 'Preparing…' : 'Tell it in a voice'),
                         ),
                       ),
+                      if (_busy) ...[
+                        const SizedBox(height: 16),
+                        PacedProgress(
+                          done: _arrived,
+                          duration: kNarrationPace,
+                          revealAfter: kNarrationBarReveal,
+                          messages: kNarratingMessages,
+                        ),
+                      ],
                       // Only the user's own stories: the samples and anything
                       // saved from the community aren't theirs to delete.
                       if (story.source == StorySource.generated)

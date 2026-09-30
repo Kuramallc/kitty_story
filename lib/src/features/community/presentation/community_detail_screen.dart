@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/presentation/verify_email_sheet.dart';
+import '../../../common/widgets/paced_progress.dart';
 import '../../player/presentation/tell_in_voice.dart';
 import '../data/community_repository.dart';
 import '../domain/published_story.dart';
@@ -19,7 +20,8 @@ class CommunityDetailScreen extends ConsumerStatefulWidget {
   final PublishedStory? initial;
 
   @override
-  ConsumerState<CommunityDetailScreen> createState() => _CommunityDetailScreenState();
+  ConsumerState<CommunityDetailScreen> createState() =>
+      _CommunityDetailScreenState();
 }
 
 class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
@@ -28,13 +30,16 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
   int _likeCount = 0;
   bool _liking = false;
   bool _busyPlay = false;
+  bool _arrivedPlay = false;
 
   CommunityRepository get _repo => ref.read(communityRepositoryProvider);
   late final Stream<bool> _likedStream = _repo.watchLiked(widget.storyId);
-  late final Stream<int> _commentCountStream =
-      _repo.watchComments(widget.storyId).map((c) => c.length);
-  late final Stream<bool> _savedStream =
-      _repo.watchArchivedFlag(widget.storyId);
+  late final Stream<int> _commentCountStream = _repo
+      .watchComments(widget.storyId)
+      .map((c) => c.length);
+  late final Stream<bool> _savedStream = _repo.watchArchivedFlag(
+    widget.storyId,
+  );
 
   @override
   void initState() {
@@ -68,8 +73,9 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
       if (mounted) setState(() => _likeCount = r.likeCount);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Could not update like.')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Could not update like.')));
       }
     } finally {
       if (mounted) setState(() => _liking = false);
@@ -96,7 +102,11 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
       }
     } catch (error) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not update your library: ${friendlyError(error)}')),
+        SnackBar(
+          content: Text(
+            'Could not update your library: ${friendlyError(error)}',
+          ),
+        ),
       );
     }
   }
@@ -105,17 +115,37 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
     final story = _story;
     if (story == null) return;
     final messenger = ScaffoldMessenger.of(context);
-    setState(() => _busyPlay = true);
+    setState(() {
+      _busyPlay = true;
+      _arrivedPlay = false;
+    });
     try {
       await _repo.archive(story);
     } catch (_) {
       // Non-fatal: still try to play.
     }
-    messenger.showSnackBar(const SnackBar(content: Text('Saved to your library')));
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Saved to your library')),
+    );
     if (mounted) {
-      await tellStoryInVoice(context, ref, story.toStory(), story.title);
+      await tellStoryInVoice(
+        context,
+        ref,
+        story.toStory(),
+        story.title,
+        // Only fires when the wait was long enough for the bar to be on
+        // screen; a cached replay skips it and goes straight to the player.
+        onSynthesized: () {
+          if (mounted) setState(() => _arrivedPlay = true);
+        },
+      );
     }
-    if (mounted) setState(() => _busyPlay = false);
+    if (mounted) {
+      setState(() {
+        _busyPlay = false;
+        _arrivedPlay = false;
+      });
+    }
   }
 
   void _openComments() {
@@ -135,7 +165,10 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(padding: EdgeInsets.all(16), child: Text('Report this story')),
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Report this story'),
+            ),
             for (final r in const ['Not appropriate for kids', 'Spam', 'Other'])
               ListTile(title: Text(r), onTap: () => Navigator.pop(context, r)),
           ],
@@ -147,9 +180,11 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(accepted
-              ? 'Thanks — we\'ll take a look.'
-              : "Thanks — you've already reported this story."),
+          content: Text(
+            accepted
+                ? 'Thanks — we\'ll take a look.'
+                : "Thanks — you've already reported this story.",
+          ),
         ),
       );
     }
@@ -183,7 +218,9 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
               final saved = snap.data ?? false;
               return IconButton(
                 icon: Icon(saved ? Icons.bookmark : Icons.bookmark_border),
-                tooltip: saved ? 'Remove from my stories' : 'Save to my stories',
+                tooltip: saved
+                    ? 'Remove from my stories'
+                    : 'Save to my stories',
                 onPressed: () => _toggleSave(saved),
               );
             },
@@ -197,9 +234,12 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
           children: [
             Text(story.title, style: theme.textTheme.headlineSmall),
             const SizedBox(height: 4),
-            Text('Shared by a Kitty Stories family',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text(
+              'Shared by a Kitty Stories family',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
             if (story.tags.all.isNotEmpty) ...[
               const SizedBox(height: 10),
               Wrap(
@@ -212,7 +252,10 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
               ),
             ],
             const SizedBox(height: 16),
-            Text(story.text, style: theme.textTheme.bodyLarge?.copyWith(height: 1.6)),
+            Text(
+              story.text,
+              style: theme.textTheme.bodyLarge?.copyWith(height: 1.6),
+            ),
           ],
         ),
       ),
@@ -220,6 +263,7 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
         likeCount: _likeCount,
         liking: _liking,
         busyPlay: _busyPlay,
+        arrivedPlay: _arrivedPlay,
         likedStream: _likedStream,
         commentCountStream: _commentCountStream,
         onLike: _toggleLike,
@@ -236,6 +280,7 @@ class _ActionBar extends StatelessWidget {
     required this.likeCount,
     required this.liking,
     required this.busyPlay,
+    required this.arrivedPlay,
     required this.likedStream,
     required this.commentCountStream,
     required this.onLike,
@@ -247,6 +292,7 @@ class _ActionBar extends StatelessWidget {
   final int likeCount;
   final bool liking;
   final bool busyPlay;
+  final bool arrivedPlay;
   final Stream<bool> likedStream;
   final Stream<int> commentCountStream;
   final VoidCallback onLike;
@@ -263,44 +309,64 @@ class _ActionBar extends StatelessWidget {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              StreamBuilder<bool>(
-                stream: likedStream,
-                builder: (context, snap) {
-                  final liked = snap.data ?? false;
-                  return TextButton.icon(
-                    onPressed: liking ? null : onLike,
-                    icon: Icon(liked ? Icons.favorite : Icons.favorite_border,
-                        color: liked ? theme.colorScheme.primary : null),
-                    label: Text('$likeCount'),
-                  );
-                },
-              ),
-              StreamBuilder<int>(
-                stream: commentCountStream,
-                builder: (context, snap) => TextButton.icon(
-                  onPressed: onComment,
-                  icon: const Icon(Icons.mode_comment_outlined),
-                  label: Text('${snap.data ?? 0}'),
+              if (busyPlay)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 4, 0, 12),
+                  child: PacedProgress(
+                    done: arrivedPlay,
+                    duration: kNarrationPace,
+                    revealAfter: kNarrationBarReveal,
+                    messages: kNarratingMessages,
+                  ),
                 ),
-              ),
-              // Red, and sitting apart from the counts, so it reads as
-              // "report this" rather than another way to keep the story.
-              IconButton(
-                onPressed: onReport,
-                icon: const Icon(Icons.flag_outlined),
-                color: theme.colorScheme.error,
-                tooltip: 'Report this story',
-              ),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: busyPlay ? null : onPlay,
-                icon: busyPlay
-                    ? const SizedBox(
-                        height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.play_arrow),
-                label: Text(busyPlay ? 'Preparing…' : 'Play'),
+              Row(
+                children: [
+                  StreamBuilder<bool>(
+                    stream: likedStream,
+                    builder: (context, snap) {
+                      final liked = snap.data ?? false;
+                      return TextButton.icon(
+                        onPressed: liking ? null : onLike,
+                        icon: Icon(
+                          liked ? Icons.favorite : Icons.favorite_border,
+                          color: liked ? theme.colorScheme.primary : null,
+                        ),
+                        label: Text('$likeCount'),
+                      );
+                    },
+                  ),
+                  StreamBuilder<int>(
+                    stream: commentCountStream,
+                    builder: (context, snap) => TextButton.icon(
+                      onPressed: onComment,
+                      icon: const Icon(Icons.mode_comment_outlined),
+                      label: Text('${snap.data ?? 0}'),
+                    ),
+                  ),
+                  // Red, and sitting apart from the counts, so it reads as
+                  // "report this" rather than another way to keep the story.
+                  IconButton(
+                    onPressed: onReport,
+                    icon: const Icon(Icons.flag_outlined),
+                    color: theme.colorScheme.error,
+                    tooltip: 'Report this story',
+                  ),
+                  const Spacer(),
+                  FilledButton.icon(
+                    onPressed: busyPlay ? null : onPlay,
+                    icon: busyPlay
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.play_arrow),
+                    label: Text(busyPlay ? 'Preparing…' : 'Play'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -337,12 +403,16 @@ class _CommentSheetState extends ConsumerState<_CommentSheet> {
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _posting = true);
     try {
-      await ref.read(communityRepositoryProvider).addComment(widget.storyId, text);
+      await ref
+          .read(communityRepositoryProvider)
+          .addComment(widget.storyId, text);
       _ctrl.clear();
     } catch (error) {
       if (!mounted) return;
       if (!await showVerifyEmailIfNeeded(context, error)) {
-        messenger.showSnackBar(SnackBar(content: Text(_friendlyComment(error))));
+        messenger.showSnackBar(
+          SnackBar(content: Text(_friendlyComment(error))),
+        );
       }
     } finally {
       if (mounted) setState(() => _posting = false);
@@ -353,7 +423,9 @@ class _CommentSheetState extends ConsumerState<_CommentSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.7,
         child: Column(
@@ -365,7 +437,9 @@ class _CommentSheetState extends ConsumerState<_CommentSheet> {
             const Divider(height: 1),
             Expanded(
               child: StreamBuilder<List<StoryComment>>(
-                stream: ref.read(communityRepositoryProvider).watchComments(widget.storyId),
+                stream: ref
+                    .read(communityRepositoryProvider)
+                    .watchComments(widget.storyId),
                 builder: (context, snap) {
                   if (!snap.hasData) {
                     return const Center(child: CircularProgressIndicator());
@@ -373,9 +447,12 @@ class _CommentSheetState extends ConsumerState<_CommentSheet> {
                   final comments = snap.data!;
                   if (comments.isEmpty) {
                     return Center(
-                      child: Text('No comments yet. Be the first!',
-                          style: theme.textTheme.bodyMedium
-                              ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                      child: Text(
+                        'No comments yet. Be the first!',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     );
                   }
                   return ListView.builder(
@@ -386,9 +463,17 @@ class _CommentSheetState extends ConsumerState<_CommentSheet> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const CircleAvatar(radius: 16, child: Icon(Icons.person, size: 18)),
+                          const CircleAvatar(
+                            radius: 16,
+                            child: Icon(Icons.person, size: 18),
+                          ),
                           const SizedBox(width: 10),
-                          Expanded(child: Text(comments[i].text, style: theme.textTheme.bodyMedium)),
+                          Expanded(
+                            child: Text(
+                              comments[i].text,
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -421,7 +506,10 @@ class _CommentSheetState extends ConsumerState<_CommentSheet> {
                       onPressed: _posting ? null : _post,
                       icon: _posting
                           ? const SizedBox(
-                              height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : const Icon(Icons.send),
                     ),
                   ],

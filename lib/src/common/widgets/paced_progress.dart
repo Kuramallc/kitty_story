@@ -23,6 +23,7 @@ class PacedProgress extends StatefulWidget {
     super.key,
     required this.done,
     this.duration = const Duration(seconds: 10),
+    this.revealAfter = Duration.zero,
     this.messages = const <String>[],
   });
 
@@ -32,6 +33,15 @@ class PacedProgress extends StatefulWidget {
   /// Roughly how long the bar takes to crawl most of the way to [_ceiling].
   /// Overrunning is expected and handled — the bar just keeps easing.
   final Duration duration;
+
+  /// Stay invisible for this long before appearing.
+  ///
+  /// For work that is usually instant but occasionally slow — a cached
+  /// narration versus a fresh one — showing a bar unconditionally flashes it
+  /// for a frame on the common path, which is worse than showing nothing. The
+  /// pacing clock still starts on mount, so when the bar does appear it is
+  /// already where the elapsed time says it should be.
+  final Duration revealAfter;
 
   /// Rotating copy shown under the bar, cycled while waiting.
   final List<String> messages;
@@ -48,8 +58,10 @@ const Duration _messageEvery = Duration(milliseconds: 2600);
 class _PacedProgressState extends State<PacedProgress> {
   final _random = Random();
   Timer? _timer;
+  Timer? _revealTimer;
   double _value = 0;
   int _elapsedTicks = 0;
+  late bool _revealed = widget.revealAfter == Duration.zero;
 
   /// Fraction of the remaining gap to close per tick, solved so the bar is
   /// ~95% of the way to the ceiling after [PacedProgress.duration].
@@ -61,6 +73,11 @@ class _PacedProgressState extends State<PacedProgress> {
   @override
   void initState() {
     super.initState();
+    if (!_revealed) {
+      _revealTimer = Timer(widget.revealAfter, () {
+        if (mounted) setState(() => _revealed = true);
+      });
+    }
     if (!widget.done) _start();
   }
 
@@ -92,6 +109,7 @@ class _PacedProgressState extends State<PacedProgress> {
   @override
   void dispose() {
     _timer?.cancel();
+    _revealTimer?.cancel();
     super.dispose();
   }
 
@@ -104,6 +122,7 @@ class _PacedProgressState extends State<PacedProgress> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_revealed) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final message = _message;
     return Column(
