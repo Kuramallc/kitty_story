@@ -7,7 +7,6 @@ import '../../stories/domain/story.dart';
 import '../data/community_repository.dart';
 import '../domain/published_story.dart';
 import '../../../common/errors.dart';
-import '../../../common/widgets/paced_progress.dart';
 
 /// Moderates a generated story, shows Claude's proposed tags for editing, and
 /// publishes it to the community pool.
@@ -20,31 +19,8 @@ class PublishTagsScreen extends ConsumerStatefulWidget {
   ConsumerState<PublishTagsScreen> createState() => _PublishTagsScreenState();
 }
 
-/// What the moderation pass actually does, in the order it does it. Unlike the
-/// story-writing copy these are not decorative: prepareStoryForPublish really
-/// is one model call that judges safety and proposes tags, so saying so is
-/// accurate. It is still a single request, so the bar is paced, not measured.
-const _checkingMessages = [
-  'Reading your story…',
-  'Checking it is gentle enough for young listeners…',
-  'Picking tags so other families can find it…',
-];
-
-/// Both calls are fast once the function is warm and slow on a cold start:
-/// prepareStoryForPublish measured 1.9s and 2.3s warm against 24.5s cold.
-///
-/// Paced for the warm case. At ~2s the bar reads as real progress and
-/// completes; on a cold start it reaches the ceiling early and waits there
-/// with the messages still rotating, which is the designed degradation. There
-/// is no single pace that covers a twelve-fold spread, and getting the common
-/// path right matters more than the first call after an idle period.
-const _checkingPace = Duration(seconds: 6);
-const _publishingPace = Duration(seconds: 6);
-
 class _PublishTagsScreenState extends ConsumerState<PublishTagsScreen> {
   bool _loading = true;
-  bool _checked = false;
-  bool _published = false;
   bool _safe = false;
   String _reason = '';
   bool _publishing = false;
@@ -62,11 +38,6 @@ class _PublishTagsScreenState extends ConsumerState<PublishTagsScreen> {
     try {
       final result =
           await ref.read(communityRepositoryProvider).prepareToPublish(widget.story.id);
-      if (!mounted) return;
-      // Let the bar reach 100% before the editor replaces it, so the check
-      // reads as finished rather than interrupted.
-      setState(() => _checked = true);
-      await Future<void>.delayed(const Duration(milliseconds: 280));
       if (!mounted) return;
       setState(() {
         _safe = result.safe;
@@ -104,9 +75,6 @@ class _PublishTagsScreenState extends ConsumerState<PublishTagsScreen> {
             generatedStoryId: widget.story.id,
             tags: StoryTags(content: _content, style: _style, wisdom: _wisdom),
           );
-      if (!mounted) return;
-      setState(() => _published = true);
-      await Future<void>.delayed(const Duration(milliseconds: 280));
       if (!mounted) return;
       context.pop(); // back to the story page
       messenger.showSnackBar(
@@ -161,11 +129,11 @@ class _PublishTagsScreenState extends ConsumerState<PublishTagsScreen> {
               ),
             ),
             const SizedBox(height: 28),
-            PacedProgress(
-              done: _checked,
-              duration: _checkingPace,
-              messages: _checkingMessages,
-            ),
+            // A spinner, not a progress bar: the check is about two seconds
+            // warm, and a bar for that is theatre — it would crawl a sliver
+            // and jump to full. The explanation above is what the user
+            // actually needs here; the spinner just says "working".
+            const CircularProgressIndicator(),
           ],
         ),
       ),
@@ -215,20 +183,12 @@ class _PublishTagsScreenState extends ConsumerState<PublishTagsScreen> {
         const SizedBox(height: 24),
         FilledButton.icon(
           onPressed: _publishing ? null : _publish,
-          icon: const Icon(Icons.public),
+          icon: _publishing
+              ? const SizedBox(
+                  height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.public),
           label: Text(_publishing ? 'Publishing…' : 'Publish to community'),
         ),
-        if (_publishing) ...[
-          const SizedBox(height: 16),
-          PacedProgress(
-            done: _published,
-            duration: _publishingPace,
-            messages: const [
-              'Sharing it with the community…',
-              'Adding your tags…',
-            ],
-          ),
-        ],
       ],
     );
   }
