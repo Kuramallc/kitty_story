@@ -40,6 +40,22 @@ class StoryRepository {
   }
 
   /// This user's AI-generated stories, newest first.
+  /// One-shot read of the user's generated stories.
+  ///
+  /// Shuffle needs the list *now*; [myStoriesProvider] is autoDispose, so with
+  /// nothing listening its `.value` is null and an empty list would be
+  /// mistaken for "no stories". Same reasoning as VoiceRepository.fetchVoices.
+  Future<List<Story>> fetchGenerated() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return const [];
+    final snapshot = await _firestore
+        .collection('users').doc(uid)
+        .collection('generatedStories')
+        .orderBy('createdAt', descending: true)
+        .get();
+    return snapshot.docs.map(Story.fromGeneratedDoc).toList();
+  }
+
   Stream<List<Story>> watchGenerated() {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return Stream.value(const []);
