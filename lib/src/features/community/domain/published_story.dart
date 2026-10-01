@@ -95,6 +95,19 @@ class ArchivedStory {
   final StoryTags tags;
   final DateTime? archivedAt;
 
+  /// Adapts to a [Story] good enough to narrate.
+  ///
+  /// `text` is empty on purpose: a saved story only stores its title and tags,
+  /// and synthesizeNarration resolves the body server-side from
+  /// publishedStories/{id} — the client sends storyId and storySource, never
+  /// the text. Do not use this for anything that needs to *read* the story.
+  Story toStory() => Story(
+        id: publishedStoryId,
+        source: StorySource.published,
+        title: title,
+        text: '',
+      );
+
   factory ArchivedStory.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data() ?? const {};
     return ArchivedStory(

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,12 +10,21 @@ import '../../../common/widgets/page_width.dart';
 
 /// Navigation payload for the player.
 class PlayerArgs {
-  const PlayerArgs({required this.url, required this.title});
-  final String url;
+  const PlayerArgs({this.url, required this.title});
+
+  /// The narration to load, or null to attach to whatever is already playing.
+  ///
+  /// Shuffle has already loaded and started a story by the time it opens this
+  /// screen; reloading would restart it, and there is no URL to hand over
+  /// anyway since the next one is chosen as the last finishes.
+  final String? url;
+
+  /// Shown until the handler reports a media item. Shuffle moves on to other
+  /// stories, so the live title comes from the handler, not from here.
   final String title;
 }
 
-const _sleepOptions = <int>[2, 4, 6, 8];
+const _sleepOptions = <int>[2, 5, 10, 30];
 
 /// How many player screens are currently mounted — 0 or 1 in practice.
 ///
@@ -43,9 +55,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     super.initState();
     playerScreensOpen.value++;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final url = widget.args.url;
+      if (url == null) return; // shuffle already has something playing
       final handler = ref.read(audioHandlerProvider);
-      await handler.loadStory(url: widget.args.url, title: widget.args.title);
-      await handler.play();
+      await handler.loadStory(url: url, title: widget.args.title);
+      // Not awaited: just_audio completes this future when the clip *ends*,
+      // so awaiting it parks here for the length of the story.
+      unawaited(handler.play());
     });
   }
 
@@ -66,6 +82,24 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final handler = ref.watch(audioHandlerProvider);
     final theme = Theme.of(context);
 
+    return StreamBuilder<MediaItem?>(
+      stream: handler.mediaItem,
+      builder: (context, itemSnap) {
+        // Shuffle moves between stories while this screen is open, so the
+        // title follows the handler rather than the arguments it was opened
+        // with. Falls back to those until the first item arrives.
+        final title = itemSnap.data?.title ?? widget.args.title;
+        return _body(context, theme, handler, title);
+      },
+    );
+  }
+
+  Widget _body(
+    BuildContext context,
+    ThemeData theme,
+    StoryAudioHandler handler,
+    String title,
+  ) {
     return Scaffold(
       appBar: AppBar(title: const Text('Now playing')),
       body: SafeArea(
@@ -83,7 +117,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  widget.args.title,
+                  title,
                   style: theme.textTheme.headlineSmall,
                   textAlign: TextAlign.center,
                 ),

@@ -190,6 +190,20 @@ class CommunityRepository {
     return ref.snapshots().map((s) => s.exists);
   }
 
+  /// One-shot read of the saved community stories. See
+  /// StoryRepository.fetchGenerated for why shuffle cannot use the stream
+  /// provider here.
+  Future<List<ArchivedStory>> fetchArchived() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return const [];
+    final snapshot = await _firestore
+        .collection('users').doc(uid)
+        .collection('archived')
+        .orderBy('archivedAt', descending: true)
+        .get();
+    return snapshot.docs.map(ArchivedStory.fromDoc).toList();
+  }
+
   Stream<List<ArchivedStory>> watchArchived() {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return Stream.value(const []);
