@@ -97,14 +97,45 @@ class _PublishTagsScreenState extends ConsumerState<PublishTagsScreen> {
       appBar: AppBar(title: const Text('Publish story')),
       body: SafeArea(
         child: _loading
-            ? const _Centered(child: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Checking your story…'),
-              ])
+            ? _checking(theme)
             : !_safe
                 ? _blocked(theme)
                 : _editor(theme),
+      ),
+    );
+  }
+
+  /// The moderation wait. States plainly that a model is reading the story —
+  /// a parent is handing something their child will hear to other families'
+  /// children, and is owed a clear account of what is being done to it.
+  Widget _checking(ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.auto_awesome, size: 40, color: theme.colorScheme.primary),
+            const SizedBox(height: 16),
+            Text('Checking your story', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              'AI reads it to make sure it stays gentle and age-appropriate, '
+              'and suggests tags so other families can find it. You can edit '
+              'the tags before publishing.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 28),
+            // A spinner, not a progress bar: the check is about two seconds
+            // warm, and a bar for that is theatre — it would crawl a sliver
+            // and jump to full. The explanation above is what the user
+            // actually needs here; the spinner just says "working".
+            const CircularProgressIndicator(),
+          ],
+        ),
       ),
     );
   }
@@ -153,7 +184,8 @@ class _PublishTagsScreenState extends ConsumerState<PublishTagsScreen> {
         FilledButton.icon(
           onPressed: _publishing ? null : _publish,
           icon: _publishing
-              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(
+                  height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.public),
           label: Text(_publishing ? 'Publishing…' : 'Publish to community'),
         ),
@@ -165,14 +197,6 @@ class _PublishTagsScreenState extends ConsumerState<PublishTagsScreen> {
 String _friendly(Object error) =>
     friendlyError(error, fallback: 'Could not publish. Please try again.');
 
-class _Centered extends StatelessWidget {
-  const _Centered({required this.child});
-  final List<Widget> child;
-  @override
-  Widget build(BuildContext context) => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: child),
-      );
-}
 
 class _CategoryEditor extends StatefulWidget {
   const _CategoryEditor({
